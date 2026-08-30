@@ -6,6 +6,7 @@ const PORT = Number(process.env.PORT) || 3000;
 
 // Debug: capture last request for /debug endpoint
 let lastInteraction: { time: string; sig: string | undefined; ts: string | undefined; bodySnippet: string; verified: boolean } | null = null;
+let lastRequest: { time: string; method: string; path: string; headers: Record<string, string> } | null = null;
 
 function getPublicKey(): string {
   return process.env.DISCORD_PUBLIC_KEY ?? "";
@@ -67,15 +68,16 @@ async function handleInteractions(
 
   const type = interaction.type as number;
 
+  // Capture ALL requests for debug endpoint (including PINGs)
+  lastInteraction = { time: new Date().toISOString(), sig: signature, ts: timestamp, bodySnippet: body.substring(0, 200), verified: isVerified };
+
   // PING (type 1) — Discord verification handshake
   if (type === 1) {
+    console.log(`[interactions] PING received — responding with PONG`);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ type: 1 })); // PONG
     return;
   }
-
-  // Capture request for debug endpoint
-  lastInteraction = { time: new Date().toISOString(), sig: signature, ts: timestamp, bodySnippet: body.substring(0, 200), verified: isVerified };
 
   // Reject unsigned non-PING interactions
   if (!isVerified) {
@@ -132,6 +134,14 @@ export function createApp() {
 
     console.log(`[http] ${req.method} ${req.url}`);
 
+    // Capture ALL incoming requests for debug
+    const headerSnapshot: Record<string, string> = {};
+    for (const key of Object.keys(req.headers)) {
+      const val = req.headers[key];
+      if (typeof val === 'string') headerSnapshot[key] = val;
+    }
+    lastRequest = { time: new Date().toISOString(), method: req.method ?? 'UNKNOWN', path: req.url ?? '/', headers: headerSnapshot };
+
     // Only accept POST /interactions and GET /healthz
     if (req.method === "POST" && path === "/interactions") {
       try {
@@ -153,7 +163,7 @@ export function createApp() {
 
     if (req.method === "GET" && path === "/debug") {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ publicKey: getPublicKey().substring(0, 8) + '...', lastInteraction }, null, 2));
+      res.end(JSON.stringify({ publicKey: getPublicKey().substring(0, 8) + '...', lastRequest, lastInteraction }, null, 2));
       return;
     }
 
