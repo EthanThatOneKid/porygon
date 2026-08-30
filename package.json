@@ -1,0 +1,50 @@
+{
+  "name": "porygon",
+  "version": "0.1.0",
+  "description": "A stateful agent named Porygon, built with the Letta Agent SDK",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EthanThatOneKid/porygon.git"
+  },
+  "keywords": [
+    "letta",
+    "agent",
+    "stateful",
+    "porygon",
+    "ai"
+  ],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/EthanThatOneKid/porygon/issues"
+  },
+  "homepage": "https://github.com/EthanThatOneKid/porygon#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@letta-ai/letta-agent-sdk": "^0.7.7"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.11"
+  }
+}
