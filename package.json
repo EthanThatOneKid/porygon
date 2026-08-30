@@ -18,7 +18,8 @@
     "test": "vitest run",
     "discord:setup": "./scripts/discord-setup.sh",
     "discord:start": "./scripts/discord-start.sh",
-    "discord:status": "./scripts/discord-status.sh"
+    "discord:status": "./scripts/discord-status.sh",
+    "discord:register": "./scripts/register-context-menu.sh"
   },
   "repository": {
     "type": "git",
