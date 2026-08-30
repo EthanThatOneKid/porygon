@@ -73,11 +73,13 @@ describe("server", () => {
   beforeEach(async () => {
     mockRunning = false;
     vi.clearAllMocks();
+    process.env.DISCORD_PUBLIC_KEY = "test-public-key";
     server = createApp();
     await new Promise<void>((resolve) => server.listen(0, resolve));
   });
 
   afterEach(async () => {
+    delete process.env.DISCORD_PUBLIC_KEY;
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 

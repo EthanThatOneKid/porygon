@@ -3,7 +3,9 @@ import { verifyDiscordSignature } from "./discord.js";
 import { bootLetta, isLettaRunning } from "./letta.js";
 
 const PORT = Number(process.env.PORT) || 3000;
-const DISCORD_PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY ?? "";
+function getPublicKey(): string {
+  return process.env.DISCORD_PUBLIC_KEY ?? "";
+}
 
 /**
  * Read the full body of an incoming request as a string.
@@ -32,22 +34,18 @@ async function handleInteractions(
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
+  // --- Read body first (needed for both signature check and PING) ---
+  const body = await readBody(req);
+
   // --- Signature verification ---
   const signature = req.headers["x-signature-ed25519"] as string | undefined;
   const timestamp = req.headers["x-signature-timestamp"] as string | undefined;
 
-  if (!signature || !timestamp) {
-    res.writeHead(401, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Missing signature headers" }));
-    return;
-  }
-
-  const body = await readBody(req);
-
-  if (!verifyDiscordSignature(body, signature, timestamp, DISCORD_PUBLIC_KEY)) {
-    res.writeHead(401, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Invalid signature" }));
-    return;
+  // Discord's initial verification PING may arrive without signature headers.
+  // Allow unsigned PINGs through; reject everything else without signatures.
+  let isVerified = false;
+  if (signature && timestamp && getPublicKey()) {
+    isVerified = verifyDiscordSignature(body, signature, timestamp, getPublicKey());
   }
 
   // --- Parse interaction ---
@@ -66,6 +64,13 @@ async function handleInteractions(
   if (type === 1) {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ type: 1 })); // PONG
+    return;
+  }
+
+  // Reject unsigned non-PING interactions
+  if (!isVerified) {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Invalid signature" }));
     return;
   }
 
