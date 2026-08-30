@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Porygon Discord + OpenCode Go setup
-# This script configures the Letta Discord channel and provider.
+# Porygon Discord Setup (Letta Cloud)
+# Creates the agent on Letta Cloud and configures the Discord channel.
 
 LETTA_CHANNELS_DIR="${HOME}/.letta/channels"
 DISCORD_DIR="${LETTA_CHANNELS_DIR}/discord"
+ACCOUNTS_FILE="${DISCORD_DIR}/accounts.json"
 
-echo "=== Porygon Discord Setup ==="
+echo "=== Porygon Discord Setup (Letta Cloud) ==="
 echo ""
 
 # Check if Letta CLI is installed
@@ -17,96 +18,105 @@ if ! command -v letta &> /dev/null; then
   exit 1
 fi
 
-# Step 1: Configure Discord channel
-echo "Step 1: Configure Discord channel"
-echo ""
-echo "You'll need:"
-echo "  1. A Discord Bot Token (from https://discord.com/developers/applications)"
-echo "  2. Your Discord User ID (right-click your name in Discord → Copy User ID)"
+# Step 1: Authenticate with Letta Cloud
+echo "Step 1: Authenticate with Letta Cloud"
 echo ""
 
-read -p "Press Enter to start Discord configuration wizard... "
-letta channels configure discord
-
-# Step 2: Connect OpenCode Go provider
-echo ""
-echo "Step 2: Connect OpenCode Go provider"
-echo ""
-
-# Check if OpenCode auth exists
-if [ -f "${HOME}/.local/share/opencode/auth.json" ]; then
-  OPENCODE_KEY=$(node -e "
-    const fs = require('fs');
-    const auth = JSON.parse(fs.readFileSync('${HOME}/.local/share/opencode/auth.json', 'utf8'));
-    console.log(auth['opencode-go']?.key || '');
-  " 2>/dev/null)
-
-  if [ -n "$OPENCODE_KEY" ]; then
-    echo "Found OpenCode Go API key from local auth."
-    letta --backend local connect openai-compatible \
-      --name "OpenCode Go" \
-      --base-url "https://opencode.ai/zen/go/v1" \
-      --api-key "$OPENCODE_KEY"
-  else
-    echo "No OpenCode Go key found. Please provide your API key:"
-    read -p "API Key: " OPENCODE_KEY
-    letta --backend local connect openai-compatible \
-      --name "OpenCode Go" \
-      --base-url "https://opencode.ai/zen/go/v1" \
-      --api-key "$OPENCODE_KEY"
-  fi
-else
-  echo "No OpenCode auth found. Please provide your API key:"
-  read -p "API Key: " OPENCODE_KEY
-  letta --backend local connect openai-compatible \
-    --name "OpenCode Go" \
-    --base-url "https://opencode.ai/zen/go/v1" \
-    --api-key "$OPENCODE_KEY"
+if ! letta backend 2>&1 | grep -q "cloud"; then
+  echo "Setting backend to Letta Cloud..."
+  letta backend cloud
 fi
 
-# Step 3: Add agentId to accounts.json
-echo ""
-echo "Step 3: Link agent to Discord"
+echo "Backend: Letta Cloud ✓"
 echo ""
 
-# Find the agent
-AGENT_ID=$(letta agents list --json 2>/dev/null | node -e "
+# Step 2: Create agent on Letta Cloud
+echo "Step 2: Create Porygon agent on Letta Cloud"
+echo ""
+
+AGENT_ID=$(letta agents list --query Porygon 2>/dev/null | node -e "
   let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
     try {
-      const agents = JSON.parse(d);
-      const porygon = agents.find(a => a.name === 'Porygon');
+      const resp = JSON.parse(d);
+      const items = resp.items || resp.response?.items || [];
+      const porygon = items.find(a => a.name === 'Porygon');
       if (porygon) console.log(porygon.id);
     } catch(e) {}
   });
 " 2>/dev/null)
 
 if [ -z "$AGENT_ID" ]; then
-  echo "No Porygon agent found. Creating one..."
-  cd "$(dirname "$0")/.." && npm start
-  echo "Created. Re-run this script to link to Discord."
-  exit 0
-fi
+  echo "Creating Porygon agent on Letta Cloud..."
+  RESULT=$(letta agents create --name "Porygon" --personality blank 2>&1)
+  AGENT_ID=$(echo "$RESULT" | node -e "
+    let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+      try {
+        const agent = JSON.parse(d);
+        console.log(agent.id);
+      } catch(e) {}
+    });
+  " 2>/dev/null)
 
-echo "Found agent: $AGENT_ID"
-
-# Update accounts.json with agentId
-ACCOUNTS_FILE="${DISCORD_DIR}/accounts.json"
-if [ -f "$ACCOUNTS_FILE" ]; then
-  node -e "
-    const fs = require('fs');
-    const config = JSON.parse(fs.readFileSync('${ACCOUNTS_FILE}', 'utf8'));
-    config.accounts[0].agentId = '${AGENT_ID}';
-    config.accounts[0].dmPolicy = 'open';
-    fs.writeFileSync('${ACCOUNTS_FILE}', JSON.stringify(config, null, 2));
-    console.log('Updated accounts.json with agentId: ${AGENT_ID}');
-  "
+  if [ -z "$AGENT_ID" ]; then
+    echo "Error: Failed to create agent."
+    echo "$RESULT"
+    exit 1
+  fi
+  echo "Created agent: $AGENT_ID"
 else
-  echo "Error: accounts.json not found. Run Discord setup first."
+  echo "Found existing agent: $AGENT_ID"
+fi
+echo ""
+
+# Step 3: Configure Discord channel
+echo "Step 3: Configure Discord channel"
+echo ""
+echo "You'll need:"
+echo "  1. A Discord Bot Token (from https://discord.com/developers/applications)"
+echo "  2. Your Discord User ID (right-click your name in Discord → Copy User ID)"
+echo ""
+
+read -p "Discord Bot Token: " BOT_TOKEN
+read -p "Your Discord User ID: " USER_ID
+
+if [ -z "$BOT_TOKEN" ] || [ -z "$USER_ID" ]; then
+  echo "Error: Token and User ID are required."
   exit 1
 fi
 
+# Write accounts.json with correct camelCase format
+mkdir -p "$DISCORD_DIR"
+cat > "$ACCOUNTS_FILE" << ACCOUNTS
+{
+  "accounts": [
+    {
+      "channel": "discord",
+      "accountId": "porygon",
+      "enabled": true,
+      "token": "${BOT_TOKEN}",
+      "agentId": "${AGENT_ID}",
+      "defaultPermissionMode": "standard",
+      "dmPolicy": "open",
+      "adminUsers": ["${USER_ID}"],
+      "allowedUsers": [],
+      "allowedChannels": [],
+      "autoThreadOnMention": false,
+      "inboundDebounceMs": 0,
+      "acknowledgeMessageReaction": false,
+      "transcribeVoice": false,
+      "createdAt": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
+      "updatedAt": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+    }
+  ]
+}
+ACCOUNTS
+
+echo "✓ accounts.json written"
 echo ""
+
 echo "=== Setup Complete ==="
+echo ""
+echo "Agent ID: ${AGENT_ID}"
 echo ""
 echo "Next steps:"
 echo "  1. Start the server:  npm run discord:start"
