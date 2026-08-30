@@ -8,6 +8,7 @@ Porygon is a helpful AI assistant with persistent memory that helps Ethan with g
 
 - Node.js 22.19+
 - Letta CLI installed globally (`npm install -g @letta-ai/letta-code`)
+- A provider API key (OpenCode Go, OpenAI, Anthropic, etc.)
 
 ## Install
 
@@ -15,37 +16,96 @@ Porygon is a helpful AI assistant with persistent memory that helps Ethan with g
 npm install
 ```
 
-## Usage
+## Quick Start
 
 ```bash
+# 1. Create the agent
 npm start
+
+# 2. Set up Discord channel + provider
+npm run discord:setup
+
+# 3. Start the server
+npm run discord:start
+
+# 4. DM Porygon in Discord!
 ```
 
-This creates a new "Porygon" agent with local backend, sends a greeting, and streams the response.
+## Discord Deployment
 
-### Build
+### Configuration
+
+The Discord channel is configured in `~/.letta/channels/discord/accounts.json`. Key fields:
+
+```json
+{
+  "accounts": [{
+    "channel": "discord",
+    "accountId": "main",
+    "token": "YOUR_BOT_TOKEN",
+    "agentId": "agent-local-xxxxx",
+    "dmPolicy": "open",
+    "allowedUsers": ["YOUR_DISCORD_USER_ID"]
+  }]
+}
+```
+
+**Important:** The `agentId` field is required — without it, Porygon responds with "not connected".
+
+### Provider Setup
+
+Porygon uses OpenCode Go (DeepSeek V4 Flash) by default. Configure via:
 
 ```bash
+letta --backend local connect openai-compatible \
+  --name "OpenCode Go" \
+  --base-url "https://opencode.ai/zen/go/v1" \
+  --api-key "YOUR_KEY"
+```
+
+### Tool Restrictions
+
+The agent is configured with restricted tools to minimize token usage (~3K tokens vs ~30K for full toolset):
+
+| Tool | Purpose |
+|------|---------|
+| `send_message` | Respond to user |
+| `conversation_search` | Recall past context |
+| `core_memory_append` | Learn new info |
+| `core_memory_replace` | Update existing memory |
+| `memory` | Manage memory blocks |
+
+### Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run discord:setup` | Interactive Discord + provider setup |
+| `npm run discord:start` | Start the Letta server with Discord |
+| `npm run discord:status` | Check channel status and routes |
+
+### Channel Commands
+
+Once connected, use these commands in Discord:
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show channel usage guidance |
+| `/status` | Show agent and conversation state |
+| `/pause` | Pause agent replies |
+| `/resume` | Resume agent replies |
+| `/cancel` | Cancel the current agent turn |
+
+## Other Commands
+
+```bash
+# Build
 npm run build
-```
 
-### Type check
-
-```bash
+# Type check
 npm run check
-```
 
-## Configuration
-
-The agent runs with `backend: "local"` by default, which requires no API key. Agent state is stored on your local machine.
-
-To use Letta Cloud instead, update the client configuration in `src/index.ts`:
-
-```typescript
-const client = new LettaAgentClient({
-  backend: "cloud",
-  apiKey: process.env.LETTA_API_KEY,
-});
+# Run tests
+npm test
 ```
 
 ## Data
