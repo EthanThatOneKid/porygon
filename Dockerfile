@@ -7,8 +7,9 @@ WORKDIR /app
 RUN npm install -g @letta-ai/letta-code
 
 # Copy dependency manifests first (layer cache)
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+COPY package.json ./
+COPY package-lock.json* ./
+RUN npm install --omit=dev
 
 # Copy source and build TypeScript
 COPY tsconfig.json tsconfig.build.json ./
