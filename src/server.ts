@@ -142,16 +142,22 @@ export function createApp() {
     }
     lastRequest = { time: new Date().toISOString(), method: req.method ?? 'UNKNOWN', path: req.url ?? '/', headers: headerSnapshot };
 
-    // Only accept POST /interactions and GET /healthz
-    if (req.method === "POST" && path === "/interactions") {
-      try {
-        await handleInteractions(req, res);
-      } catch (err) {
-        console.error("[interactions] Unhandled error:", err);
-        if (!res.headersSent) {
-          res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "Internal server error" }));
+    // Accept any method on /interactions (Discord may GET/HEAD before POST)
+    if (path === "/interactions") {
+      if (req.method === "POST") {
+        try {
+          await handleInteractions(req, res);
+        } catch (err) {
+          console.error("[interactions] Unhandled error:", err);
+          if (!res.headersSent) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Internal server error" }));
+          }
         }
+      } else {
+        // GET/HEAD/etc on /interactions — return 200 so Discord's pre-check passes
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
       }
       return;
     }
