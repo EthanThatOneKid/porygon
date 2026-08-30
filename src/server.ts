@@ -3,6 +3,10 @@ import { verifyDiscordSignature } from "./discord.js";
 import { bootLetta, isLettaRunning } from "./letta.js";
 
 const PORT = Number(process.env.PORT) || 3000;
+
+// Debug: capture last request for /debug endpoint
+let lastInteraction: { time: string; sig: string | undefined; ts: string | undefined; bodySnippet: string; verified: boolean } | null = null;
+
 function getPublicKey(): string {
   return process.env.DISCORD_PUBLIC_KEY ?? "";
 }
@@ -69,6 +73,9 @@ async function handleInteractions(
     res.end(JSON.stringify({ type: 1 })); // PONG
     return;
   }
+
+  // Capture request for debug endpoint
+  lastInteraction = { time: new Date().toISOString(), sig: signature, ts: timestamp, bodySnippet: body.substring(0, 200), verified: isVerified };
 
   // Reject unsigned non-PING interactions
   if (!isVerified) {
@@ -141,6 +148,12 @@ export function createApp() {
 
     if (req.method === "GET" && path === "/healthz") {
       handleHealthz(req, res);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/debug") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ publicKey: getPublicKey().substring(0, 8) + '...', lastInteraction }, null, 2));
       return;
     }
 
