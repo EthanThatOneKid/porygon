@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: porygon
+    runtime: image
+    image:
+      url: # Set after first Docker build, or use Render's "Deploy from Dockerfile"
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: DISCORD_PUBLIC_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: DISCORD_BOT_TOKEN
+        sync: false  # Set manually in Render dashboard
+      - key: LETTA_API_KEY
+        sync: false  # Set manually in Render dashboard
