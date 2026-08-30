@@ -1,166 +1,90 @@
 # Porygon
 
-A stateful agent named Porygon, built with the [Letta Agent SDK](https://github.com/letta-ai/letta-agent-sdk).
+A stateful Discord bot powered by [Letta Cloud](https://app.letta.com). Porygon remembers conversations across sessions and channels.
 
-Porygon is a helpful AI assistant with persistent memory that helps Ethan with general tasks, coding, research, and problem-solving. It remembers context across conversations and learns from interactions.
+Built with [discord.js](https://discord.js.org) and the [Letta TypeScript SDK](https://github.com/letta-ai/letta-client).
 
-## Prerequisites
+## Features
 
-- Node.js 22.19+
-- Letta CLI installed globally (`npm install -g @letta-ai/letta-code`)
-- Letta Cloud account (free tier: 3 agents)
+- **Stateful memory** — Porygon remembers context across conversations
+- **Multi-channel** — Responds to DMs, @mentions, and replies
+- **Letta Cloud** — Agent state persists across restarts
+- **Render-ready** — Deploys on Render free tier
 
-## Install
+## Quickstart
+
+### Prerequisites
+
+- Node.js 20+
+- A [Discord bot token](https://discord.com/developers/applications)
+- A [Letta Cloud API key](https://app.letta.com/preferences/api-keys)
+- A Letta agent ID (create one at [app.letta.com](https://app.letta.com))
+
+### Local development
 
 ```bash
+# Clone and install
+git clone https://github.com/EthanThatOneKid/porygon.git
+cd porygon
 npm install
+
+# Configure
+cp .env.template .env
+# Edit .env with your tokens
+
+# Run
+npm run dev
 ```
 
-## Quick Start
+### Deploy to Render
 
-```bash
-# 1. Authenticate with Letta Cloud
-letta setup
-# → Select "Letta Cloud" → authenticate via browser
+1. Connect your GitHub repo to [Render](https://render.com)
+2. Create a new **Web Service** using the `Dockerfile`
+3. Set environment variables:
+   - `DISCORD_TOKEN` — Your bot token
+   - `LETTA_API_KEY` — Your Letta Cloud API key
+   - `LETTA_AGENT_ID` — Your agent's ID
+4. Deploy
 
-# 2. Set up Discord channel + create cloud agent
-npm run discord:setup
+The bot connects to Discord via WebSocket (no public URL needed).
 
-# 3. Start the server
-npm run discord:start
+## Environment Variables
 
-# 4. DM Porygon in Discord!
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DISCORD_TOKEN` | Yes | — | Discord bot token |
+| `LETTA_API_KEY` | Yes | — | Letta Cloud API key |
+| `LETTA_AGENT_ID` | Yes | — | Letta agent ID to use |
+| `LETTA_BASE_URL` | No | `https://api.letta.com` | Letta API base URL |
+| `LETTA_USE_SENDER_PREFIX` | No | `true` | Include sender context in messages |
+| `LETTA_CONTEXT_MESSAGE_COUNT` | No | `5` | Recent messages to include as context |
+| `RESPOND_TO_DMS` | No | `true` | Respond to direct messages |
+| `RESPOND_TO_MENTIONS` | No | `true` | Respond to @mentions |
+| `RESPOND_TO_BOTS` | No | `false` | Respond to other bots |
+| `RESPOND_TO_GENERIC` | No | `false` | Respond to all channel messages |
+| `DISCORD_CHANNEL_ID` | No | — | Restrict to a specific channel |
+| `PORT` | No | `3001` | HTTP server port |
+
+## Architecture
+
+```
+Discord ←WebSocket→ discord.js ←→ Letta Cloud API
+                    ↑
+              Express (health check)
 ```
 
-## How It Works
+The bot connects to Discord's gateway via WebSocket. Messages are sent to Letta Cloud for processing, and responses are sent back to Discord.
 
-Porygon runs on **Letta Cloud** — agent state (memory, conversations, identity) is stored in the cloud, so it stays online 24/7 without a local server. The `letta server` process on your machine acts as a bridge: it connects to Letta Cloud, receives Discord messages via the adapter, and routes them to the cloud-hosted agent.
+## Health Check
 
 ```
-Discord → Local server (bridge) → Letta Cloud (agent state + LLM)
-```
-
-## Discord Deployment
-
-### Configuration
-
-The Discord channel is configured in `~/.letta/channels/discord/accounts.json`:
-
-```json
+GET /healthz
 {
-  "accounts": [{
-    "channel": "discord",
-    "accountId": "porygon",
-    "enabled": true,
-    "token": "YOUR_BOT_TOKEN",
-    "agentId": "agent-xxxxx",
-    "defaultPermissionMode": "standard",
-    "dmPolicy": "open",
-    "adminUsers": ["YOUR_DISCORD_USER_ID"],
-    "allowedUsers": [],
-    "allowedChannels": [],
-    "autoThreadOnMention": false,
-    "inboundDebounceMs": 0,
-    "acknowledgeMessageReaction": false,
-    "transcribeVoice": false
-  }]
+  "status": "ok",
+  "discord": "connected",
+  "uptime": 123.45
 }
 ```
-
-**Important:** Keys must be **camelCase** (not snake_case). The `agentId` field is required — without it, Porygon responds with "not connected".
-
-### Agent on Letta Cloud
-
-The agent lives on Letta Cloud (free tier: 3 agents, BYOK for LLM usage):
-
-```bash
-# Create agent
-letta agents create --name "Porygon" --personality blank
-
-# List agents
-letta agents list
-
-# Check agent config
-letta agents config --agent <agent-id>
-```
-
-### Scripts
-
-| Command | Description |
-|---------|-------------|
-| `npm run discord:setup` | Interactive Discord + cloud agent setup |
-| `npm run discord:start` | Start the server (bridge to Letta Cloud) |
-| `npm run discord:status` | Check channel status and routes |
-
-### Channel Commands
-
-Once connected, use these commands in Discord:
-
-| Command | Description |
-|---------|-------------|
-| `/help` | Show channel usage guidance |
-| `/status` | Show agent and conversation state |
-| `/pause` | Pause agent replies |
-| `/resume` | Resume agent replies |
-| `/cancel` | Cancel the current agent turn |
-
-## Render Deployment (Free Tier)
-
-Porygon can be deployed on [Render](https://render.com) free tier for always-on operation.
-
-### Setup
-
-1. **Create a Render account** at [render.com](https://render.com) (no credit card required)
-2. **Connect your GitHub repo** — Render will detect the `Dockerfile`
-3. **Set environment variables** in the Render dashboard:
-
-| Variable | Description |
-|----------|-------------|
-| `DISCORD_PUBLIC_KEY` | Discord app public key (from Developer Portal → App → General Information) |
-| `DISCORD_BOT_TOKEN` | Discord bot token (from Developer Portal → Bot) |
-| `LETTA_API_KEY` | Letta Cloud API key (from [chat.letta.com/preferences/api-keys](https://chat.letta.com/preferences/api-keys)) |
-
-4. **Deploy** — Render builds the Dockerfile and starts the server
-
-### How it works
-
-```
-Discord → Render (HTTP interactions endpoint) → Letta Cloud (agent state + LLM)
-```
-
-- **Cold start**: 25-60 seconds on free tier
-- **Health check**: GET `/healthz` keeps the service alive
-- **Wake-up**: Right-click any user in Discord → "Turn On Porygon" (context menu command)
-
-### Waking the bot
-
-When Porygon goes offline (after ~15 min idle):
-1. Right-click any user in Discord
-2. Select **Apps → Turn On Porygon**
-3. The bot defers the response, boots the Letta server in the background
-4. ~30 seconds later, Porygon comes online and responds
-
-## Development
-
-```bash
-# Build
-npm run build
-
-# Type check
-npm run check
-
-# Run tests
-npm test
-```
-
-## Data
-
-Porygon reads from the shared knowledge graph via the wiki memory connector in `porygon-memory`.
-
-| Repo | Description |
-|------|-------------|
-| [`porygon-memory`](https://github.com/EthanThatOneKid/porygon-memory) | Agent-specific raw captures and wiki pages |
-| [`memory`](https://github.com/EthanThatOneKid/memory) | Personal knowledge graph |
 
 ## License
 
