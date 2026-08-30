@@ -46,6 +46,9 @@ async function handleInteractions(
   let isVerified = false;
   if (signature && timestamp && getPublicKey()) {
     isVerified = verifyDiscordSignature(body, signature, timestamp, getPublicKey());
+    console.log(`[interactions] sig=${signature.substring(0, 12)}... ts=${timestamp} verified=${isVerified}`);
+  } else {
+    console.log(`[interactions] no sig headers (sig=${!!signature} ts=${!!timestamp} key=${!!getPublicKey()})`);
   }
 
   // --- Parse interaction ---
@@ -118,9 +121,12 @@ function handleHealthz(_req: IncomingMessage, res: ServerResponse): void {
 export function createApp() {
   return createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
+    const path = url.pathname.replace(/\/+$/, ""); // strip trailing slashes
+
+    console.log(`[http] ${req.method} ${req.url}`);
 
     // Only accept POST /interactions and GET /healthz
-    if (req.method === "POST" && url.pathname === "/interactions") {
+    if (req.method === "POST" && path === "/interactions") {
       try {
         await handleInteractions(req, res);
       } catch (err) {
@@ -133,12 +139,13 @@ export function createApp() {
       return;
     }
 
-    if (req.method === "GET" && url.pathname === "/healthz") {
+    if (req.method === "GET" && path === "/healthz") {
       handleHealthz(req, res);
       return;
     }
 
     // 404 for everything else
+    console.log(`[http] 404 for ${req.method} ${req.url}`);
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "Not found" }));
   });
