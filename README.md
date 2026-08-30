@@ -104,6 +104,42 @@ Once connected, use these commands in Discord:
 | `/resume` | Resume agent replies |
 | `/cancel` | Cancel the current agent turn |
 
+## Render Deployment (Free Tier)
+
+Porygon can be deployed on [Render](https://render.com) free tier for always-on operation.
+
+### Setup
+
+1. **Create a Render account** at [render.com](https://render.com) (no credit card required)
+2. **Connect your GitHub repo** — Render will detect the `Dockerfile`
+3. **Set environment variables** in the Render dashboard:
+
+| Variable | Description |
+|----------|-------------|
+| `DISCORD_PUBLIC_KEY` | Discord app public key (from Developer Portal → App → General Information) |
+| `DISCORD_BOT_TOKEN` | Discord bot token (from Developer Portal → Bot) |
+| `LETTA_API_KEY` | Letta Cloud API key (from [chat.letta.com/preferences/api-keys](https://chat.letta.com/preferences/api-keys)) |
+
+4. **Deploy** — Render builds the Dockerfile and starts the server
+
+### How it works
+
+```
+Discord → Render (HTTP interactions endpoint) → Letta Cloud (agent state + LLM)
+```
+
+- **Cold start**: 25-60 seconds on free tier
+- **Health check**: GET `/healthz` keeps the service alive
+- **Wake-up**: Right-click any user in Discord → "Turn On Porygon" (context menu command)
+
+### Waking the bot
+
+When Porygon goes offline (after ~15 min idle):
+1. Right-click any user in Discord
+2. Select **Apps → Turn On Porygon**
+3. The bot defers the response, boots the Letta server in the background
+4. ~30 seconds later, Porygon comes online and responds
+
 ## Development
 
 ```bash
