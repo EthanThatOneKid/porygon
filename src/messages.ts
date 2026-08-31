@@ -1,4 +1,5 @@
 import Letta from "@letta-ai/letta-client";
+import type { AssistantMessage } from "@letta-ai/letta-client/resources/agents/messages";
 import {
   Message,
   OmitPartialGroupDMChannel,
@@ -150,28 +151,24 @@ export async function sendMessageRaw(
   const response = await letta.agents.messages.create(AGENT_ID, {
     messages: [{ role: "user", content }],
   });
-  console.log(`📥 Letta responded (${response.messages?.length || 0} messages)`);
-  console.log(`📥 Messages:`, JSON.stringify(response.messages?.map((m: any) => ({ role: m.role, content: m.content }))));
+  console.log(`📥 Letta responded (${response.messages.length} messages)`);
 
-  // Handle both formats: messages with role field, or messages with just content
-  const assistantMessages = response.messages?.filter(
-    (m: any) => m.role === "assistant" || (!m.role && m.content),
+  // Use proper SDK types - filter by message_type discriminator
+  const assistantMessages = response.messages.filter(
+    (m): m is AssistantMessage => m.message_type === "assistant_message",
   );
 
-  console.log(`📥 Assistant messages found: ${assistantMessages?.length || 0}`);
-
-  if (!assistantMessages || assistantMessages.length === 0) {
-    console.log(`📥 No assistant messages - returning empty`);
+  if (assistantMessages.length === 0) {
     return "";
   }
 
   return assistantMessages
-    .map((m: any) => {
+    .map((m) => {
       if (typeof m.content === "string") return m.content;
       if (Array.isArray(m.content)) {
         return m.content
-          .filter((c: any) => c.type === "text")
-          .map((c: any) => c.text)
+          .filter((c) => c.type === "text")
+          .map((c) => "text" in c ? c.text : "")
           .join("");
       }
       return "";
@@ -270,21 +267,21 @@ export async function sendTimerMessage(): Promise<string> {
   });
   console.log(`📥 Letta responded (${response.messages?.length || 0} messages)`);
 
-  const assistantMessages = response.messages?.filter(
-    (m: any) => m.role === "assistant",
+  const assistantMessages = response.messages.filter(
+    (m): m is AssistantMessage => m.message_type === "assistant_message",
   );
 
-  if (!assistantMessages || assistantMessages.length === 0) {
+  if (assistantMessages.length === 0) {
     return "";
   }
 
   return assistantMessages
-    .map((m: any) => {
+    .map((m) => {
       if (typeof m.content === "string") return m.content;
       if (Array.isArray(m.content)) {
         return m.content
-          .filter((c: any) => c.type === "text")
-          .map((c: any) => c.text)
+          .filter((c) => c.type === "text")
+          .map((c) => "text" in c ? c.text : "")
           .join("");
       }
       return "";

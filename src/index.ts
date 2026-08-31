@@ -326,14 +326,9 @@ async function processMessage(
 ) {
   try {
     await message.channel.sendTyping();
-    console.log(`🔄 Processing message, calling sendMessage...`);
     const reply = await sendMessage(message, messageType);
-    console.log(`📝 Reply received: ${reply ? reply.substring(0, 100) + '...' : '(empty)'}`);
     if (reply) {
       await sendSplitReply(message, reply);
-      console.log(`✅ Reply sent to Discord`);
-    } else {
-      console.log(`⚠️ No reply to send`);
     }
   } catch (err) {
     console.error("🛑 Error processing message:", err);
