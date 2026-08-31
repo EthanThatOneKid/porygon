@@ -6,9 +6,8 @@ Built with [discord.js](https://discord.js.org) and the [Letta Agent SDK](https:
 
 ## Features
 
-**Free tier (current):**
-- **Web search** — Search the web and fetch page content
-- **Memory** — Agent remembers context across conversations
+- **Cloud compute access** — Agent runs shell commands, installs deps, and uses tools via managed cloud sandboxes
+- **Stateful memory** — Porygon remembers context across conversations
 - **Multi-channel** — Responds to DMs, @mentions, and replies
 - **Thread support** — Full thread context and optional reply-in-threads
 - **Message batching** — Accumulates rapid messages to reduce API calls
@@ -18,11 +17,10 @@ Built with [discord.js](https://discord.js.org) and the [Letta Agent SDK](https:
 - **Letta Cloud** — Agent state persists across restarts
 - **Render-ready** — Deploys on Render free tier
 
-**Requires Pro ($20/mo) or API plan to unlock:**
-- **Cloud compute access** — Agent runs shell commands, installs deps, and uses tools via managed cloud sandboxes
+**Requires Pro ($20/mo) or API plan for additional features:**
 - **Tool approval** — Interactive Approve/Deny buttons for human-in-the-loop tool execution
 - **Session isolation** — Per-channel, per-user, or global sandbox isolation
-- **Cloud sandbox tools** — Bash, Read, Write, Edit, Git, Search, Memory, Skills, Subagents
+- **BYOM (Bring Your Own Machine)** — Run agent tools on your own computer instead of cloud sandbox
 
 ## Quickstart
 
@@ -107,22 +105,6 @@ npm run build  # Build for production
 4. Deploy
 
 > **Note:** `render.yaml` declares these env vars with `sync: false`, meaning they must be set manually in the Render dashboard — they won't be pulled from any `.env` file.
-
-### Agent Configuration
-
-The agent ID determines which Letta agent Porygon uses. The default `render.yaml` uses a **Blank** agent that doesn't claim tool access it doesn't have.
-
-**Free tier:** Use the Blank agent (no cloud sandbox tools):
-```bash
-LETTA_AGENT_ID=agent-73c98a83-9c1d-4d85-8856-93b0932b2e10
-```
-
-**Pro/API plan:** Create a Letta Code agent for full cloud sandbox tools:
-```bash
-letta --new-agent --personality letta-code --name "Porygon"
-# Note the agent ID from the output
-LETTA_AGENT_ID=<new-agent-id>
-```
 
 The bot connects to Discord via WebSocket (no public URL needed).
 
@@ -261,8 +243,6 @@ Controls how Letta sessions map to Discord:
 ```
 
 ### Cloud Sandbox Tools
-
-> **Requires Pro ($20/mo) or API plan.** Free tier does not include cloud sandboxes. If no tools are reported at startup, upgrade at [app.letta.com/settings/billing](https://app.letta.com/settings/billing).
 
 The cloud sandbox is an isolated computer provisioned by Letta Cloud for each session. It provides a full Linux environment with:
 
