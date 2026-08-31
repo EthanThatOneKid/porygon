@@ -151,12 +151,16 @@ export async function sendMessageRaw(
     messages: [{ role: "user", content }],
   });
   console.log(`📥 Letta responded (${response.messages?.length || 0} messages)`);
+  console.log(`📥 Messages:`, JSON.stringify(response.messages?.map((m: any) => ({ role: m.role, content: m.content }))));
 
   const assistantMessages = response.messages?.filter(
     (m: any) => m.role === "assistant",
   );
 
+  console.log(`📥 Assistant messages found: ${assistantMessages?.length || 0}`);
+
   if (!assistantMessages || assistantMessages.length === 0) {
+    console.log(`📥 No assistant messages - returning empty`);
     return "";
   }
 
