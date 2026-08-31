@@ -1,16 +1,14 @@
 import "dotenv/config";
-import express, { raw } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import nacl from "tweetnacl";
 import {
   Client,
   GatewayIntentBits,
+  Interaction,
   Message,
   OmitPartialGroupDMChannel,
   Partials,
-  REST,
-  Routes,
   ApplicationCommandType,
-  ContextMenuCommandBuilder,
 } from "discord.js";
 import { sendMessage, sendMessageRaw, sendTimerMessage, MessageType, splitMessage, formatPrefix } from "./messages.js";
 
@@ -101,17 +99,32 @@ async function registerContextMenuCommand() {
     return;
   }
 
-  const rest = new REST().setToken(process.env.DISCORD_TOKEN);
-  const command = new ContextMenuCommandBuilder()
-    .setName("Start Porygon")
-    .setType(ApplicationCommandType.User);
+  const appId = client.user.id;
+  const commandBody = [{
+    name: "Start Porygon",
+    type: 2, // ApplicationCommandType.User
+  }];
 
   try {
     console.log("📋 Registering context menu command...");
-    await rest.put(Routes.applicationCommands(client.user.id), {
-      body: command.toJSON(),
-    });
-    console.log("✅ Context menu command registered");
+
+    const res = await fetch(
+      `https://discord.com/api/v10/applications/${appId}/commands`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bot ${process.env.DISCORD_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(commandBody),
+      },
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("❌ Failed to register context menu command:", JSON.stringify(data, null, 2));
+    } else {
+      console.log("✅ Context menu command registered");
+    }
   } catch (err) {
     console.error("❌ Failed to register context menu command:", err);
   }
@@ -254,6 +267,23 @@ function addMessageToBatch(
   }, MESSAGE_BATCH_TIMEOUT_MS);
   channelBatchTimers.set(channelId, timeout);
 }
+
+// ── Interaction handler (context menu commands via WebSocket) ────────────────
+client.on("interactionCreate", async (interaction: Interaction) => {
+  if (!interaction.isContextMenuCommand()) return;
+
+  const commandName = interaction.commandName;
+  console.log(`📋 Context menu command: ${commandName}`);
+
+  if (commandName === "Start Porygon") {
+    await interaction.reply({
+      content: client.isReady()
+        ? "✅ Porygon is already online!"
+        : "🔌 Waking up Porygon...",
+      ephemeral: true,
+    });
+  }
+});
 
 // ── Message handler ────────────────────────────────────────────────────────────
 client.on("messageCreate", async (message) => {
@@ -425,65 +455,85 @@ app.get("/", (_req, res) => {
 // This endpoint receives interactions via HTTP POST from Discord.
 // It's used to wake up the bot on Render's free tier when someone
 // uses the context menu command.
-app.post("/interactions", raw({ type: "application/json" }), (req, res) => {
-  const signature = req.headers["x-signature-ed25519"] as string;
-  const timestamp = req.headers["x-signature-timestamp"] as string;
-  const body = req.body.toString();
+//
+// Discord verification: sends a PING (type=1) when you set the endpoint URL.
+// Must respond with {"type": 1} within 3 seconds.
+app.post("/interactions", (req: Request, res: Response) => {
+  // Collect raw body for signature verification
+  let rawBody = "";
+  req.on("data", (chunk) => {
+    rawBody += chunk.toString();
+  });
+  req.on("end", () => {
+    const signature = req.headers["x-signature-ed25519"] as string;
+    const timestamp = req.headers["x-signature-timestamp"] as string;
 
-  // Verify signature if public key is set
-  if (INTERACTION_PUBLIC_KEY) {
+    // Verify signature if public key is set
+    if (INTERACTION_PUBLIC_KEY && signature && timestamp) {
+      try {
+        const isValid = nacl.sign.detached.verify(
+          new TextEncoder().encode(timestamp + rawBody),
+          Uint8Array.from(Buffer.from(signature, "hex")),
+          Uint8Array.from(Buffer.from(INTERACTION_PUBLIC_KEY, "hex")),
+        );
+        if (!isValid) {
+          console.warn("⚠️  Invalid interaction signature");
+          res.status(401).json({ error: "Invalid request signature" });
+          return;
+        }
+      } catch (err) {
+        console.error("❌ Signature verification error:", err);
+        res.status(401).json({ error: "Signature verification failed" });
+        return;
+      }
+    }
+
+    let interaction;
     try {
-      const isValid = nacl.sign.detached.verify(
-        new TextEncoder().encode(timestamp + body),
-        Uint8Array.from(Buffer.from(signature, "hex")),
-        Uint8Array.from(Buffer.from(INTERACTION_PUBLIC_KEY, "hex")),
-      );
-      if (!isValid) {
-        console.warn("⚠️  Invalid interaction signature");
-        return res.status(401).json({ error: "Invalid request signature" });
-      }
+      interaction = JSON.parse(rawBody);
     } catch (err) {
-      console.error("❌ Signature verification error:", err);
-      return res.status(401).json({ error: "Signature verification failed" });
+      console.error("❌ Failed to parse interaction body:", err);
+      res.status(400).json({ error: "Invalid JSON" });
+      return;
     }
-  }
 
-  const interaction = JSON.parse(body);
+    // Handle PING (Discord verification)
+    if (interaction.type === 1) {
+      console.log("🏓 Interaction PING received");
+      res.json({ type: 1 });
+      return;
+    }
 
-  // Handle PING (Discord verification)
-  if (interaction.type === 1) {
-    console.log("🏓 Interaction PING received");
-    return res.json({ type: 1 });
-  }
+    // Handle context menu command
+    if (interaction.type === 2) {
+      const commandName = interaction.data?.name;
+      console.log(`📋 Context menu command: ${commandName}`);
 
-  // Handle context menu command
-  if (interaction.type === 2) {
-    const commandName = interaction.data?.name;
-    console.log(`📋 Context menu command: ${commandName}`);
+      // "Start Porygon" context menu command
+      if (commandName === "Start Porygon") {
+        // Respond immediately, then connect to Discord if not already
+        if (!client.isReady()) {
+          console.log("🔌 Waking up - connecting to Discord...");
+          client.login(process.env.DISCORD_TOKEN || "").catch((err) => {
+            console.error("❌ Failed to connect to Discord:", err);
+          });
+        }
 
-    // "Start Porygon" context menu command
-    if (commandName === "Start Porygon") {
-      // Respond immediately, then connect to Discord if not already
-      if (!client.isReady()) {
-        console.log("🔌 Waking up - connecting to Discord...");
-        client.login(process.env.DISCORD_TOKEN || "").catch((err) => {
-          console.error("❌ Failed to connect to Discord:", err);
+        res.json({
+          type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+          data: {
+            content: client.isReady()
+              ? "✅ Porygon is already online!"
+              : "🔌 Waking up Porygon...",
+          },
         });
+        return;
       }
-
-      return res.json({
-        type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
-        data: {
-          content: client.isReady()
-            ? "✅ Porygon is already online!"
-            : "🔌 Waking up Porygon...",
-        },
-      });
     }
-  }
 
-  // Unknown interaction type
-  res.json({ type: 1 });
+    // Unknown interaction type - respond with PONG
+    res.json({ type: 1 });
+  });
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────────
