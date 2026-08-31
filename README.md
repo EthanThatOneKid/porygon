@@ -6,7 +6,7 @@ Built with [discord.js](https://discord.js.org) and the [Letta Agent SDK](https:
 
 ## Features
 
-- **Cloud compute access** — Agent runs shell commands, installs deps, and uses tools via managed cloud sandboxes
+**Free tier (BYOK only):**
 - **Stateful memory** — Porygon remembers context across conversations
 - **Multi-channel** — Responds to DMs, @mentions, and replies
 - **Thread support** — Full thread context and optional reply-in-threads
@@ -16,6 +16,12 @@ Built with [discord.js](https://discord.js.org) and the [Letta Agent SDK](https:
 - **Code block preservation** — Splits messages without breaking code fences
 - **Letta Cloud** — Agent state persists across restarts
 - **Render-ready** — Deploys on Render free tier
+
+**Requires Pro ($20/mo) or API plan:**
+- **Cloud compute access** — Agent runs shell commands, installs deps, and uses tools via managed cloud sandboxes
+- **Tool approval** — Interactive Approve/Deny buttons for human-in-the-loop tool execution
+- **Session isolation** — Per-channel, per-user, or global sandbox isolation
+- **Cloud sandbox tools** — Bash, Read, Write, Edit, Git, Search, Memory, Skills, Subagents
 
 ## Quickstart
 
@@ -238,6 +244,8 @@ Controls how Letta sessions map to Discord:
 ```
 
 ### Cloud Sandbox Tools
+
+> **Requires Pro ($20/mo) or API plan.** Free tier does not include cloud sandboxes. If no tools are reported at startup, upgrade at [app.letta.com/settings/billing](https://app.letta.com/settings/billing).
 
 The cloud sandbox is an isolated computer provisioned by Letta Cloud for each session. It provides a full Linux environment with:
 

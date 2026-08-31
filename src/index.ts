@@ -51,6 +51,15 @@ console.log(`  DISCORD_TOKEN: ${process.env.DISCORD_TOKEN ? "✓" : "✗"}`);
 console.log(`  LETTA_API_KEY: ${process.env.LETTA_API_KEY ? "✓" : "✗"}`);
 console.log(`  LETTA_AGENT_ID: ${process.env.LETTA_AGENT_ID || "(will create)"}`);
 console.log(`  LETTA_BASE_URL: ${process.env.LETTA_BASE_URL || "https://api.letta.com"}`);
+console.log(`  SANDBOX_TTL: ${process.env.SANDBOX_TTL_MINUTES || "5"} min`);
+console.log(`  TOOL_APPROVAL: ${process.env.ENABLE_TOOL_APPROVAL === "true" ? "enabled" : "disabled"}`);
+console.log(`  SESSION_ISOLATION: ${process.env.SESSION_ISOLATION || "channel"}`);
+
+// ── Plan check ────────────────────────────────────────────────────────────────
+console.log("\n💳 Letta plan check:");
+console.log("  Cloud sandbox tools (Bash, Read, Write, etc.) require Pro ($20/mo) or API plan.");
+console.log("  Free tier: BYOK only, no remote sandboxes.");
+console.log("  If tools report 0 available, upgrade at https://app.letta.com/settings/billing");
 
 // ── Discord client ─────────────────────────────────────────────────────────────
 const client = new Client({
