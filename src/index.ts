@@ -1,11 +1,16 @@
 import "dotenv/config";
-import express from "express";
+import express, { raw } from "express";
+import nacl from "tweetnacl";
 import {
   Client,
   GatewayIntentBits,
   Message,
   OmitPartialGroupDMChannel,
   Partials,
+  REST,
+  Routes,
+  ApplicationCommandType,
+  ContextMenuCommandBuilder,
 } from "discord.js";
 import { sendMessage, sendMessageRaw, sendTimerMessage, MessageType, splitMessage, formatPrefix } from "./messages.js";
 
@@ -39,6 +44,7 @@ const TIMER_INTERVAL_MINUTES = parseInt(
 const FIRING_PROBABILITY = parseFloat(
   process.env.FIRING_PROBABILITY || "0.1",
 );
+const INTERACTION_PUBLIC_KEY = process.env.INTERACTION_PUBLIC_KEY || "";
 
 // ── Environment check ──────────────────────────────────────────────────────────
 console.log("🚀 Starting Porygon...");
@@ -70,7 +76,7 @@ client.on("error", (err) => {
   console.error("🛑 Discord client error:", err);
 });
 
-client.once("clientReady", () => {
+client.once("clientReady", async () => {
   console.log(`🤖 Logged in as ${client.user?.tag}!`);
   if (MESSAGE_BATCH_ENABLED) {
     console.log(
@@ -83,7 +89,33 @@ client.once("clientReady", () => {
     );
     startRandomEventTimer();
   }
+
+  // Register context menu command
+  await registerContextMenuCommand();
 });
+
+// ── Context menu command registration ──────────────────────────────────────
+async function registerContextMenuCommand() {
+  if (!process.env.DISCORD_TOKEN || !client.user?.id) {
+    console.warn("⚠️  Cannot register commands: missing token or client ID");
+    return;
+  }
+
+  const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+  const command = new ContextMenuCommandBuilder()
+    .setName("Start Porygon")
+    .setType(ApplicationCommandType.User);
+
+  try {
+    console.log("📋 Registering context menu command...");
+    await rest.put(Routes.applicationCommands(client.user.id), {
+      body: command.toJSON(),
+    });
+    console.log("✅ Context menu command registered");
+  } catch (err) {
+    console.error("❌ Failed to register context menu command:", err);
+  }
+}
 
 // ── Timer/heartbeat ──────────────────────────────────────────────────────────
 async function startRandomEventTimer() {
@@ -387,6 +419,71 @@ app.get("/healthz", (_req, res) => {
 
 app.get("/", (_req, res) => {
   res.json({ name: "porygon", version: "0.2.0" });
+});
+
+// ── Discord Interactions Endpoint ─────────────────────────────────────────────
+// This endpoint receives interactions via HTTP POST from Discord.
+// It's used to wake up the bot on Render's free tier when someone
+// uses the context menu command.
+app.post("/interactions", raw({ type: "application/json" }), (req, res) => {
+  const signature = req.headers["x-signature-ed25519"] as string;
+  const timestamp = req.headers["x-signature-timestamp"] as string;
+  const body = req.body.toString();
+
+  // Verify signature if public key is set
+  if (INTERACTION_PUBLIC_KEY) {
+    try {
+      const isValid = nacl.sign.detached.verify(
+        new TextEncoder().encode(timestamp + body),
+        Uint8Array.from(Buffer.from(signature, "hex")),
+        Uint8Array.from(Buffer.from(INTERACTION_PUBLIC_KEY, "hex")),
+      );
+      if (!isValid) {
+        console.warn("⚠️  Invalid interaction signature");
+        return res.status(401).json({ error: "Invalid request signature" });
+      }
+    } catch (err) {
+      console.error("❌ Signature verification error:", err);
+      return res.status(401).json({ error: "Signature verification failed" });
+    }
+  }
+
+  const interaction = JSON.parse(body);
+
+  // Handle PING (Discord verification)
+  if (interaction.type === 1) {
+    console.log("🏓 Interaction PING received");
+    return res.json({ type: 1 });
+  }
+
+  // Handle context menu command
+  if (interaction.type === 2) {
+    const commandName = interaction.data?.name;
+    console.log(`📋 Context menu command: ${commandName}`);
+
+    // "Start Porygon" context menu command
+    if (commandName === "Start Porygon") {
+      // Respond immediately, then connect to Discord if not already
+      if (!client.isReady()) {
+        console.log("🔌 Waking up - connecting to Discord...");
+        client.login(process.env.DISCORD_TOKEN || "").catch((err) => {
+          console.error("❌ Failed to connect to Discord:", err);
+        });
+      }
+
+      return res.json({
+        type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+        data: {
+          content: client.isReady()
+            ? "✅ Porygon is already online!"
+            : "🔌 Waking up Porygon...",
+        },
+      });
+    }
+  }
+
+  // Unknown interaction type
+  res.json({ type: 1 });
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────────

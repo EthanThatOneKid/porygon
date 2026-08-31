@@ -160,15 +160,34 @@ The bot connects to Discord via WebSocket (no public URL needed).
 | `TIMER_INTERVAL_MINUTES` | No | `15` | Max interval for random timer |
 | `FIRING_PROBABILITY` | No | `0.1` | Probability timer fires (0.0–1.0) |
 
+### Interactions Endpoint
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `INTERACTION_PUBLIC_KEY` | No | — | Discord interactions public key for signature verification |
+
 ## Architecture
 
 ```
 Discord ←WebSocket→ discord.js ←→ Letta Cloud API
                     ↑
-              Express (health check)
+              Express (health check + interactions)
 ```
 
 The bot connects to Discord's gateway via WebSocket. Messages are sent to Letta Cloud for processing, and responses are sent back to Discord.
+
+### Interactions Endpoint (Cold Start)
+
+On Render's free tier, the service spins down after ~15 min of inactivity. The interactions endpoint allows Discord to wake it up:
+
+1. Right-click a user in Discord → select **"Start Porygon"**
+2. Discord POSTs to `/interactions`
+3. Render wakes up, Express responds
+4. Bot connects to Discord
+
+To enable:
+1. Set `INTERACTION_PUBLIC_KEY` in Render (from Discord Developer Portal → App → General Information)
+2. Set Interactions Endpoint URL to `https://porygon.onrender.com/interactions`
 
 ## Health Check
 
