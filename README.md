@@ -26,7 +26,7 @@ Built with [discord.js](https://discord.js.org) and the [Letta Agent SDK](https:
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - A Discord bot token (see [Creating a Discord Bot Token](#creating-a-discord-bot-token) below)
 - A [Letta Cloud API key](https://app.letta.com/preferences/api-keys)
 - A Letta agent ID (create one at [app.letta.com](https://app.letta.com))
