@@ -343,26 +343,76 @@ async function extractImageAttachments(
   return images;
 }
 
+// ── Streaming configuration (#37) ─────────────────────────────────────────
+const STREAMING_ENABLED = process.env.STREAMING_ENABLED === "true";
+const STREAM_UPDATE_INTERVAL_MS = parseInt(
+  process.env.STREAM_UPDATE_INTERVAL_MS || "1000",
+  10,
+);
+const STREAM_CHUNK_SIZE = parseInt(
+  process.env.STREAM_CHUNK_SIZE || "500",
+  10,
+);
+
+export const streamingConfig = {
+  enabled: STREAMING_ENABLED,
+  updateIntervalMs: STREAM_UPDATE_INTERVAL_MS,
+  chunkSize: STREAM_CHUNK_SIZE,
+};
+
 // ── Stream assistant text from a Letta session turn ──────────────────────
+// Supports both batch (collect all, return) and streaming (progressive updates) modes.
+type StreamCallback = (chunk: string, fullText: string, done: boolean) => void;
+
 async function streamAssistantText(
   session: LettaCodeSession,
+  onChunk?: StreamCallback,
 ): Promise<string> {
   const parts: string[] = [];
+  let lastUpdate = 0;
+  let pendingChunk = "";
+
   for await (const message of session.stream()) {
     if (message.type === "assistant") {
       parts.push(message.content);
+
+      // Streaming mode: send progressive updates
+      if (onChunk) {
+        pendingChunk += message.content;
+        const now = Date.now();
+
+        // Throttle updates to avoid Discord rate limits
+        if (now - lastUpdate >= STREAM_UPDATE_INTERVAL_MS && pendingChunk.length >= STREAM_CHUNK_SIZE) {
+          onChunk(pendingChunk, parts.join(""), false);
+          pendingChunk = "";
+          lastUpdate = now;
+        }
+      }
     }
     // Reasoning and tool_call events are processed server-side;
     // we only need the final assistant text for Discord.
   }
+
+  // Flush remaining chunk
+  if (onChunk && pendingChunk.length > 0) {
+    onChunk(pendingChunk, parts.join(""), false);
+  }
+
+  // Final update with done=true
+  if (onChunk) {
+    onChunk("", parts.join(""), true);
+  }
+
   return parts.join("");
 }
 
 // ── Send raw message string to Letta ──────────────────────────────────────
+// When onChunk is provided, streams progressive updates to Discord.
 export async function sendMessageRaw(
   fullMessage: string,
   images: ImageContentBlock[] = [],
   sessionKey: string = "default",
+  onChunk?: StreamCallback,
 ): Promise<string> {
   if (!AGENT_ID) {
     throw new Error("LETTA_AGENT_ID not set");
@@ -383,16 +433,18 @@ export async function sendMessageRaw(
 
   const session = await getSessionWithRecovery(sessionKey);
   await session.send(content);
-  const reply = await streamAssistantText(session);
+  const reply = await streamAssistantText(session, onChunk);
 
   console.log(`📥 Letta responded (${reply.length} chars)`);
   return reply;
 }
 
 // ── Send message to Letta and get response ─────────────────────────────────
+// When onChunk is provided, streams progressive updates to Discord.
 export async function sendMessage(
   message: OmitPartialGroupDMChannel<Message<boolean>>,
   messageType: MessageType,
+  onChunk?: StreamCallback,
 ): Promise<string> {
   if (!AGENT_ID) {
     throw new Error("LETTA_AGENT_ID not set");
@@ -464,7 +516,7 @@ export async function sendMessage(
 
   const fullMessage = `${contextBlock}${prefix} ${message.content}`.trim();
   const images = await extractImageAttachments(message);
-  return sendMessageRaw(fullMessage, images, sessionKey);
+  return sendMessageRaw(fullMessage, images, sessionKey, onChunk);
 }
 
 // ── Send timer/heartbeat message to Letta ────────────────────────────────

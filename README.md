@@ -211,6 +211,48 @@ Uses a sliding window counter algorithm. Three independent limits:
 
 Rate-limited users see: "⏱️ Rate limited. Try again in Xs."
 
+### Streaming Responses
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `STREAMING_ENABLED` | No | `false` | Enable progressive output via message edits |
+| `STREAM_UPDATE_INTERVAL_MS` | No | `1000` | Minimum time between Discord message edits (ms) |
+| `STREAM_CHUNK_SIZE` | No | `500` | Minimum chunk size before sending an update |
+
+When enabled, Porygon shows progressive output as the agent generates it:
+
+```
+User: "What files are in the repo?"
+
+Bot: 💬 Thinking...
+      ↓ (edited)
+      Let me check the repository...
+      ↓ (edited)
+      Here are the files I found:
+      - src/index.ts
+      - src/messages.ts
+      - package.json
+      ...
+      ↓ (final)
+      Here are the files I found:
+      - src/index.ts
+      - src/messages.ts
+      - package.json
+      - README.md
+      - Dockerfile
+```
+
+**How it works:**
+1. Sends initial "💬 Thinking..." placeholder
+2. Edits the message progressively as chunks arrive
+3. Throttles edits to avoid Discord rate limits (configurable interval)
+4. Final edit with complete response (splits if > 2000 chars)
+
+**Benefits:**
+- Users see output immediately instead of waiting 10-30s
+- Tool execution progress visible in real-time
+- Better UX for long-running operations
+
 ### Interactions Endpoint
 
 | Variable | Required | Default | Description |

@@ -10,7 +10,7 @@ import {
   Partials,
   ApplicationCommandType,
 } from "discord.js";
-import { sendMessage, sendMessageRaw, sendTimerMessage, MessageType, splitMessage, formatPrefix, closeSessions, resolveApproval, getApprovalInfo, getPendingApprovalKey } from "./messages.js";
+import { sendMessage, sendMessageRaw, sendTimerMessage, MessageType, splitMessage, formatPrefix, closeSessions, resolveApproval, getApprovalInfo, getPendingApprovalKey, streamingConfig } from "./messages.js";
 import { checkRateLimit, formatRetryAfter, getRateLimitStats } from "./rateLimit.js";
 
 // ── Configuration ──────────────────────────────────────────────────────────────
@@ -56,6 +56,7 @@ console.log(`  SANDBOX_TTL: ${process.env.SANDBOX_TTL_MINUTES || "5"} min`);
 console.log(`  TOOL_APPROVAL: ${process.env.ENABLE_TOOL_APPROVAL === "true" ? "enabled" : "disabled"}`);
 console.log(`  SESSION_ISOLATION: ${process.env.SESSION_ISOLATION || "channel"}`);
 console.log(`  RATE_LIMIT: ${process.env.RATE_LIMIT_ENABLED === "true" ? "enabled" : "disabled"}`);
+console.log(`  STREAMING: ${streamingConfig.enabled ? `enabled (update every ${streamingConfig.updateIntervalMs}ms)` : "disabled"}`);
 
 // ── Discord client ─────────────────────────────────────────────────────────────
 const client = new Client({
@@ -426,15 +427,84 @@ async function processMessage(
 ) {
   try {
     await message.channel.sendTyping();
-    const reply = await sendMessage(message, messageType);
-    if (reply) {
-      await sendSplitReply(message, reply);
+
+    // Streaming mode (#37): progressive output via message edits
+    if (streamingConfig.enabled) {
+      await processMessageStreaming(message, messageType);
+    } else {
+      // Batch mode: collect full response, then send
+      const reply = await sendMessage(message, messageType);
+      if (reply) {
+        await sendSplitReply(message, reply);
+      }
     }
   } catch (err) {
     console.error("🛑 Error processing message:", err);
     if (SURFACE_ERRORS) {
       await message.reply(`❌ Error: ${(err as Error).message}`).catch(() => {});
     }
+  }
+}
+
+// ── Streaming message processing (#37) ────────────────────────────────────
+// Sends an initial placeholder, then edits it progressively as chunks arrive.
+// Handles Discord's 2000 char limit by splitting into multiple messages.
+async function processMessageStreaming(
+  message: OmitPartialGroupDMChannel<Message<boolean>>,
+  messageType: MessageType,
+) {
+  // Send initial placeholder
+  const placeholder = await message.reply("💬 Thinking...").catch(() => null);
+  if (!placeholder) return;
+
+  let lastEditedContent = "";
+  let editCount = 0;
+
+  // Callback to edit the Discord message progressively
+  const onChunk = async (chunk: string, fullText: string, done: boolean) => {
+    if (!fullText || fullText === lastEditedContent) return;
+
+    // Truncate to Discord limit for display
+    const displayText = fullText.length > 2000
+      ? fullText.substring(0, 1997) + "..."
+      : fullText;
+
+    // Only edit if content changed significantly (avoid rate limits)
+    const shouldEdit = done || displayText.length - lastEditedContent.length > 100;
+    if (!shouldEdit) return;
+
+    try {
+      await placeholder.edit(displayText);
+      lastEditedContent = displayText;
+      editCount++;
+      if (!done) {
+        console.log(`✏️ Streaming edit #${editCount} (${displayText.length} chars)`);
+      }
+    } catch (err) {
+      console.error("❌ Failed to edit streaming message:", err);
+    }
+  };
+
+  // Get the full response with streaming callbacks
+  const reply = await sendMessage(message, messageType, onChunk);
+
+  // Final edit with complete response (handle splitting if needed)
+  if (reply) {
+    const chunks = splitMessage(reply);
+    if (chunks.length === 1) {
+      // Single message: edit the placeholder
+      await placeholder.edit(chunks[0]).catch(() => {});
+    } else {
+      // Multiple messages: edit placeholder with first chunk, send rest
+      await placeholder.edit(chunks[0]).catch(() => {});
+      for (let i = 1; i < chunks.length; i++) {
+        await message.channel.send(chunks[i]).catch(() => {});
+      }
+    }
+    console.log(`✏️ Streaming complete: ${editCount} edits, ${reply.length} chars`);
+  } else {
+    // Empty response: delete placeholder
+    await placeholder.delete().catch(() => {});
   }
 }
 
