@@ -8,6 +8,11 @@ Built with [discord.js](https://discord.js.org) and the [Letta TypeScript SDK](h
 
 - **Stateful memory** — Porygon remembers context across conversations
 - **Multi-channel** — Responds to DMs, @mentions, and replies
+- **Thread support** — Full thread context and optional reply-in-threads
+- **Message batching** — Accumulates rapid messages to reduce API calls
+- **Image handling** — Forwards image attachments as multi-modal content
+- **Timer/heartbeat** — Proactive agent behavior on a randomized schedule
+- **Code block preservation** — Splits messages without breaking code fences
 - **Letta Cloud** — Agent state persists across restarts
 - **Render-ready** — Deploys on Render free tier
 
@@ -61,12 +66,21 @@ The bot connects to Discord via WebSocket (no public URL needed).
 
 ## Environment Variables
 
+### Core
+
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `DISCORD_TOKEN` | Yes | — | Discord bot token |
 | `LETTA_API_KEY` | Yes | — | Letta Cloud API key |
 | `LETTA_AGENT_ID` | Yes | — | Letta agent ID to use |
 | `LETTA_BASE_URL` | No | `https://api.letta.com` | Letta API base URL |
+| `LETTA_TIMEOUT_MS` | No | `60000` | Letta API request timeout (ms) |
+| `PORT` | No | `3001` | HTTP server port |
+
+### Message Behavior
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
 | `LETTA_USE_SENDER_PREFIX` | No | `true` | Include sender context in messages |
 | `LETTA_CONTEXT_MESSAGE_COUNT` | No | `5` | Recent messages to include as context |
 | `RESPOND_TO_DMS` | No | `true` | Respond to direct messages |
@@ -74,7 +88,39 @@ The bot connects to Discord via WebSocket (no public URL needed).
 | `RESPOND_TO_BOTS` | No | `false` | Respond to other bots |
 | `RESPOND_TO_GENERIC` | No | `false` | Respond to all channel messages |
 | `DISCORD_CHANNEL_ID` | No | — | Restrict to a specific channel |
-| `PORT` | No | `3001` | HTTP server port |
+| `SURFACE_ERRORS` | No | `false` | Show errors in Discord |
+
+### Message Batching
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `MESSAGE_BATCH_ENABLED` | No | `false` | Accumulate messages before sending |
+| `MESSAGE_BATCH_SIZE` | No | `10` | Max messages per batch |
+| `MESSAGE_BATCH_TIMEOUT_MS` | No | `30000` | Auto-drain timeout (ms) |
+
+### Thread Support
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `REPLY_IN_THREADS` | No | `false` | Reply in threads (creates new thread if needed) |
+| `ENABLE_THREAD_CONVERSATIONS` | No | `false` | Respond to all messages in threads |
+| `THREAD_CONVERSATIONS_RESPOND_WITHOUT_MENTION` | No | `false` | Skip mention requirement in threads |
+| `LETTA_THREAD_CONTEXT_ENABLED` | No | `true` | Fetch full thread context |
+| `LETTA_THREAD_MESSAGE_LIMIT` | No | `50` | Max messages to fetch from threads |
+
+### Image Handling
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ENABLE_IMAGE_HANDLING` | No | `false` | Forward image attachments to the agent |
+
+### Timer/Heartbeat
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ENABLE_TIMER` | No | `false` | Enable periodic heartbeat events |
+| `TIMER_INTERVAL_MINUTES` | No | `15` | Max interval for random timer |
+| `FIRING_PROBABILITY` | No | `0.1` | Probability timer fires (0.0–1.0) |
 
 ## Architecture
 
