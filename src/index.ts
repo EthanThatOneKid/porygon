@@ -11,6 +11,7 @@ import {
   ApplicationCommandType,
 } from "discord.js";
 import { sendMessage, sendMessageRaw, sendTimerMessage, MessageType, splitMessage, formatPrefix, closeSessions, resolveApproval, getApprovalInfo, getPendingApprovalKey } from "./messages.js";
+import { checkRateLimit, formatRetryAfter, getRateLimitStats } from "./rateLimit.js";
 
 // ── Configuration ──────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
@@ -54,6 +55,7 @@ console.log(`  LETTA_BASE_URL: ${process.env.LETTA_BASE_URL || "https://api.lett
 console.log(`  SANDBOX_TTL: ${process.env.SANDBOX_TTL_MINUTES || "5"} min`);
 console.log(`  TOOL_APPROVAL: ${process.env.ENABLE_TOOL_APPROVAL === "true" ? "enabled" : "disabled"}`);
 console.log(`  SESSION_ISOLATION: ${process.env.SESSION_ISOLATION || "channel"}`);
+console.log(`  RATE_LIMIT: ${process.env.RATE_LIMIT_ENABLED === "true" ? "enabled" : "disabled"}`);
 
 // ── Discord client ─────────────────────────────────────────────────────────────
 const client = new Client({
@@ -326,6 +328,15 @@ client.on("messageCreate", async (message) => {
   // Channel filter
   if (CHANNEL_ID && message.channel.id !== CHANNEL_ID) return;
 
+  // Rate limiting (#38)
+  const rateLimitResult = checkRateLimit(message.author.id, message.channel.id);
+  if (!rateLimitResult.allowed) {
+    const retryAfter = formatRetryAfter(rateLimitResult.retryAfterMs || 5000);
+    console.log(`🚦 Rate limited: ${message.author.id} in ${message.channel.id} (${rateLimitResult.reason}, retry after ${retryAfter})`);
+    await message.reply(`⏱️ Rate limited. Try again in ${retryAfter}.`).catch(() => {});
+    return;
+  }
+
   // Thread conversations: handle ALL messages in thread uniformly
   if (
     ENABLE_THREAD_CONVERSATIONS &&
@@ -471,6 +482,7 @@ app.get("/healthz", (_req, res) => {
         ? "connected"
         : "disconnected",
     uptime: process.uptime(),
+    rateLimit: getRateLimitStats(),
   });
 });
 

@@ -192,6 +192,25 @@ Controls how Letta sessions map to Discord:
 | `TIMER_INTERVAL_MINUTES` | No | `15` | Max interval for random timer |
 | `FIRING_PROBABILITY` | No | `0.1` | Probability timer fires (0.0–1.0) |
 
+### Rate Limiting
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `RATE_LIMIT_ENABLED` | No | `false` | Enable rate limiting |
+| `RATE_LIMIT_MAX_MESSAGES` | No | `10` | Max messages per user per window |
+| `RATE_LIMIT_WINDOW_MS` | No | `60000` | User window duration (ms) |
+| `RATE_LIMIT_CHANNEL_MAX_MESSAGES` | No | `30` | Max messages per channel per window |
+| `RATE_LIMIT_CHANNEL_WINDOW_MS` | No | `60000` | Channel window duration (ms) |
+| `RATE_LIMIT_USER_CHANNEL_MAX_MESSAGES` | No | `5` | Max messages per user per channel per window |
+| `RATE_LIMIT_USER_CHANNEL_WINDOW_MS` | No | `30000` | User-channel window duration (ms) |
+
+Uses a sliding window counter algorithm. Three independent limits:
+- **Per-user**: Prevents individual spam
+- **Per-channel**: Prevents channel flooding
+- **Per-user-per-channel**: Prevents targeted harassment
+
+Rate-limited users see: "⏱️ Rate limited. Try again in Xs."
+
 ### Interactions Endpoint
 
 | Variable | Required | Default | Description |
@@ -382,7 +401,12 @@ GET /healthz
 {
   "status": "ok",
   "discord": "connected",
-  "uptime": 123.45
+  "uptime": 123.45,
+  "rateLimit": {
+    "users": 5,
+    "channels": 3,
+    "userChannels": 12
+  }
 }
 ```
 
