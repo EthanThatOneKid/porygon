@@ -265,7 +265,7 @@ export async function sendTimerMessage(): Promise<string> {
   const response = await letta.agents.messages.create(AGENT_ID, {
     messages: [{ role: "user", content: fullMessage }],
   });
-  console.log(`📥 Letta responded (${response.messages?.length || 0} messages)`);
+  console.log(`📥 Letta responded (${response.messages.length} messages)`);
 
   const assistantMessages = response.messages.filter(
     (m): m is AssistantMessage => m.message_type === "assistant_message",
