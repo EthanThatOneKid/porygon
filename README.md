@@ -143,6 +143,14 @@ GET /healthz
 }
 ```
 
+## Development
+
+```bash
+npm run dev    # Start with hot reload
+npm test       # Run tests
+npm run build  # Build for production
+```
+
 ## License
 
 MIT
