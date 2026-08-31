@@ -196,17 +196,166 @@ Controls how Letta sessions map to Discord:
 ## Architecture
 
 ```
-Discord ←WebSocket→ discord.js ←→ Letta Agent SDK ←→ Letta Cloud
-                                                              ↓
-                                                    Cloud Sandbox
-                                                  (shell, files, tools)
-                    ↑
-              Express (health check + interactions)
+┌─────────┐    WebSocket     ┌────────────┐    HTTPS     ┌──────────────────┐
+│ Discord  │ ◄──────────────► │ discord.js │ ◄──────────► │   Letta Cloud    │
+│  Client  │                  │  (bot.js)  │              │   (Agent SDK)    │
+└─────────┘                  └────────────┘              └────────┬─────────┘
+                                                                  │
+                                                                  ▼
+                                                       ┌──────────────────┐
+                                                       │  Cloud Sandbox   │
+                                                       │ ─────────────── │
+                                                       │  Bash, Read,     │
+                                                       │  Write, Edit,    │
+                                                       │  Git, Search,    │
+                                                       │  Memory, Skills  │
+                                                       └──────────────────┘
+                    ┌────────────────────┐
+                    │  Express (port     │
+                    │  3001)             │
+                    │  • /healthz        │
+                    │  • /interactions   │
+                    └────────────────────┘
 ```
 
-The Agent SDK manages sessions with cloud sandboxes — isolated computers where the agent runs shell commands, installs dependencies, and uses tools. Each Discord channel gets its own session for conversation continuity.
+### Message Flow
 
-The bot connects to Discord's gateway via WebSocket. Messages are sent to Letta Cloud for processing, and responses are sent back to Discord.
+```
+1. Discord message → discord.js gateway
+2. Message type determined (DM / mention / reply / thread)
+3. Session key resolved (channel / user / global)
+4. Session created or resumed from cache
+5. Context assembled (recent messages, thread history, sender prefix)
+6. Images extracted and base64-encoded (if enabled)
+7. Message sent via session.send()
+8. Agent processes in cloud sandbox:
+   a. LLM reasons about the request
+   b. Tool calls executed (Bash, Read, Write, etc.)
+   c. Results fed back to LLM
+   d. Final response generated
+9. Response streamed via session.stream()
+10. Assistant text sent to Discord (split if > 2000 chars)
+```
+
+### Cloud Sandbox Tools
+
+The cloud sandbox is an isolated computer provisioned by Letta Cloud for each session. It provides a full Linux environment with:
+
+| Category | Tools | Description |
+|----------|-------|-------------|
+| **Shell** | `Bash` | Run arbitrary shell commands |
+| **Files** | `Read`, `Write`, `Edit`, `SetWorkingDirectory` | Filesystem operations |
+| **Search** | `web_search`, `fetch_webpage` | Web search and page fetching |
+| **Memory** | `memory` | Update agent memory blocks |
+| **Tasks** | `TaskCreate`, `TaskGet`, `TaskList`, `TaskUpdate`, `TaskOutput`, `TaskStop` | Background task management |
+| **Agents** | `Agent` | Launch subagents for parallel/isolated work |
+| **Git** | `EnterWorktree`, `ExitWorktree` | Isolated git worktrees |
+| **Skills** | `Skill` | Invoke agent skills on demand |
+| **Events** | `Monitor` | Watch for external events |
+
+Tools are provided by the **harness** (Letta Code runtime) at session creation time — not stored on the agent definition. The `toolset.base` setting controls which tools are available (`"auto"`, `"default"`, `"none"`).
+
+### Session Lifecycle
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    Session Lifecycle                         │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  1. Create          2. Ready           3. Active             │
+│  ┌─────────┐       ┌─────────┐       ┌─────────┐           │
+│  │ createSession() │ session.ready()  │ session.send()      │
+│  │ Provision sandbox│ Log tools       │ Stream responses    │
+│  └─────────┘       └─────────┘       └─────────┘           │
+│       │                                    │                 │
+│       │                                    ▼                 │
+│       │                            ┌─────────────┐          │
+│       │                            │  Tool calls  │          │
+│       │                            │  executed in │          │
+│       │                            │  sandbox     │          │
+│       │                            └─────────────┘          │
+│       │                                    │                 │
+│       │                                    ▼                 │
+│       │                            ┌─────────────┐          │
+│       │                            │  Response    │          │
+│       │                            │  streamed    │          │
+│       │                            └─────────────┘          │
+│       │                                    │                 │
+│       │          ┌─────────────────────────┘                 │
+│       │          │                                           │
+│       ▼          ▼                                           │
+│  ┌────────────────────┐    ┌─────────────────────┐          │
+│  │  Sandbox TTL timer │    │  4. Expired          │          │
+│  │  (5 min default)   │───►│  CloudManagedSandbox │          │
+│  │  Refresh every 4m  │    │  ExpiredError         │          │
+│  └────────────────────┘    │  → Recreate session   │          │
+│                            └─────────────────────┘          │
+│                                                              │
+│  5. Shutdown                                                            │
+│  ┌─────────────────────┐                                             │
+│  │  closeSessions()     │                                             │
+│  │  session.close()     │                                             │
+│  │  Cache cleared       │                                             │
+│  └─────────────────────┘                                             │
+└──────────────────────────────────────────────────────────────┘
+```
+
+Key behaviors:
+- **Sandbox TTL**: Sandbox expires after `SANDBOX_TTL_MINUTES` of inactivity. The bot auto-refreshes every `SANDBOX_REFRESH_INTERVAL_MS`.
+- **Recovery**: If the sandbox expires mid-conversation, the bot catches `CloudManagedSandboxExpiredError`, creates a new session, and retries the message.
+- **Cleanup**: On bot shutdown (`SIGINT`/`SIGTERM`), all sessions are closed gracefully.
+
+### Session Isolation
+
+Sessions map Discord channels/users to Letta sessions with cloud sandboxes:
+
+| Mode | Session Key | Behavior | Use Case |
+|------|-------------|----------|----------|
+| `channel` | `{channelId}` | One sandbox per channel | Default — backward compatible |
+| `user` | `{userId}:{channelId}` | One sandbox per user per channel | Maximum isolation |
+| `global` | `global` | Single shared sandbox | Shared workspace |
+
+```
+channel mode:                    user mode:
+┌──────────┐                    ┌──────────┐
+│ #general │ → sandbox-1        │ #general │ → alice → sandbox-a
+│          │                    │          │ → bob   → sandbox-b
+├──────────┤                    ├──────────┤
+│ #dev     │ → sandbox-2        │ #dev     │ → alice → sandbox-c
+│          │                    │          │ → bob   → sandbox-d
+└──────────┘                    └──────────┘
+
+global mode:
+All channels → single sandbox-1
+```
+
+### Tool Approval (Human-in-the-Loop)
+
+When `ENABLE_TOOL_APPROVAL=true`, the agent asks for permission before executing tools:
+
+```
+Agent wants to run: Bash("rm -rf /tmp/cache")
+         │
+         ▼
+┌─────────────────────┐
+│ Discord message with │
+│ [Approve] [Deny]    │
+│ buttons              │
+└─────────────────────┘
+         │
+    ┌────┴────┐
+    ▼         ▼
+[Approve]  [Deny]
+    │         │
+    ▼         ▼
+Tool runs   Tool blocked
+Result      Agent told
+returned    "Denied"
+```
+
+- Each approval has a unique key (session + tool + timestamp)
+- Timeout auto-denies after `TOOL_APPROVAL_TIMEOUT_MS`
+- Concurrent approvals don't conflict
 
 ### Interactions Endpoint (Cold Start)
 
