@@ -36,6 +36,8 @@ Built with [discord.js](https://discord.js.org) and the [Letta TypeScript SDK](h
 
 ### Local development
 
+#### Option A: Letta Cloud (quickest)
+
 ```bash
 # Clone and install
 git clone https://github.com/EthanThatOneKid/porygon.git
@@ -44,10 +46,46 @@ npm install
 
 # Configure
 cp .env.template .env
-# Edit .env with your tokens
+# Edit .env with your tokens:
+#   DISCORD_TOKEN=your_discord_token
+#   LETTA_API_KEY=your_letta_api_key
+#   LETTA_AGENT_ID=your_agent_id
 
 # Run
 npm run dev
+```
+
+#### Option B: Local Letta Server (full offline)
+
+Test against a local Letta server without cloud dependencies:
+
+```bash
+# Clone and install
+git clone https://github.com/EthanThatOneKid/porygon.git
+cd porygon
+npm install
+
+# Start local Letta server (requires Docker)
+docker compose up -d
+
+# Configure for local server
+cp .env.local.example .env.local
+# Edit .env.local with your LLM API key and Discord token
+
+# Run against local server
+LETTA_BASE_URL=http://localhost:8283 npm run dev
+```
+
+**Benefits of local mode:**
+- No Letta Cloud API key needed
+- Test with your own LLM provider (OpenAI, Anthropic, Ollama)
+- Full control over agent state
+- Faster iteration during development
+- Verify behavior before deploying to production
+
+```bash
+npm test       # Run tests
+npm run build  # Build for production
 ```
 
 ### Deploy to Render
@@ -146,9 +184,10 @@ GET /healthz
 ## Development
 
 ```bash
-npm run dev    # Start with hot reload
-npm test       # Run tests
-npm run build  # Build for production
+npm run dev          # Start with hot reload
+npm test             # Run tests
+npm run build        # Build for production
+docker compose up    # Start local Letta server
 ```
 
 ## License

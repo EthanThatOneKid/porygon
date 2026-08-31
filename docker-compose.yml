@@ -1,0 +1,25 @@
+services:
+  letta:
+    image: letta/letta:latest
+    volumes:
+      - letta-data:/var/lib/postgresql/data
+    ports:
+      - "8283:8283"
+    environment:
+      # Required: Set your LLM API keys
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      
+      # Optional: Ollama for local models
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
+    env_file:
+      - path: .env.local
+        required: false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8283/v1/agents"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  letta-data:
