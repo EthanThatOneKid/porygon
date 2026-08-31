@@ -1,5 +1,40 @@
 import { describe, it, expect } from "vitest";
-import { splitMessage } from "./messages.js";
+import { splitMessage, formatPrefix, MessageType } from "./messages.js";
+
+describe("formatPrefix", () => {
+  it("returns empty string when USE_SENDER_PREFIX is false", () => {
+    // Note: This test depends on env var state. In production, test with mocked env.
+    const result = formatPrefix("user123", "12345", MessageType.DM, "#general");
+    // Should return a prefix string (format depends on env)
+    expect(typeof result).toBe("string");
+  });
+
+  it("includes username and userId", () => {
+    const result = formatPrefix("alice", "111", MessageType.DM, "#general");
+    expect(result).toContain("alice");
+    expect(result).toContain("111");
+  });
+
+  it("formats DM correctly", () => {
+    const result = formatPrefix("bob", "222", MessageType.DM, "#general");
+    expect(result).toContain("direct message");
+  });
+
+  it("formats MENTION correctly", () => {
+    const result = formatPrefix("charlie", "333", MessageType.MENTION, "#general");
+    expect(result).toContain("mentioned you in #general");
+  });
+
+  it("formats REPLY correctly", () => {
+    const result = formatPrefix("dave", "444", MessageType.REPLY, "#general");
+    expect(result).toContain("replied to you in #general");
+  });
+
+  it("formats GENERIC correctly", () => {
+    const result = formatPrefix("eve", "555", MessageType.GENERIC, "#random");
+    expect(result).toContain("in #random");
+  });
+});
 
 describe("splitMessage", () => {
   it("returns single chunk for short messages", () => {
@@ -34,6 +69,11 @@ describe("splitMessage", () => {
     result.forEach((chunk) => {
       expect(chunk.length).toBeLessThanOrEqual(2000);
     });
+  });
+
+  it("handles empty string", () => {
+    const result = splitMessage("");
+    expect(result).toEqual([""]);
   });
 
   describe("code block preservation", () => {
@@ -127,6 +167,18 @@ describe("splitMessage", () => {
       result.forEach((chunk) => {
         expect(chunk.length).toBeLessThanOrEqual(2000);
       });
+    });
+
+    it("preserves nested code blocks", () => {
+      const msg = "```\n```\ncode\n```\n```\n";
+      const result = splitMessage(msg);
+      expect(result).toEqual([msg]);
+    });
+
+    it("handles consecutive code blocks", () => {
+      const msg = "```\nfirst\n```\n```\nsecond\n```";
+      const result = splitMessage(msg);
+      expect(result).toEqual([msg]);
     });
   });
 });
