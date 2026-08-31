@@ -48,7 +48,7 @@ client.on("error", (err) => {
   console.error("🛑 Discord client error:", err);
 });
 
-client.once("ready", () => {
+client.once("clientReady", () => {
   console.log(`🤖 Logged in as ${client.user?.tag}!`);
 });
 
@@ -148,7 +148,11 @@ const app = express();
 app.get("/healthz", (_req, res) => {
   res.json({
     status: "ok",
-    discord: client.isReady() ? "connected" : "disconnected",
+    discord: !process.env.DISCORD_TOKEN
+      ? "no-token"
+      : client.isReady()
+        ? "connected"
+        : "disconnected",
     uptime: process.uptime(),
   });
 });
@@ -162,8 +166,8 @@ app.listen(PORT, async () => {
   console.log(`🌐 Express listening on :${PORT}`);
 
   if (!process.env.DISCORD_TOKEN) {
-    console.error("❌ DISCORD_TOKEN not set!");
-    process.exit(1);
+    console.warn("⚠️  DISCORD_TOKEN not set — Discord is disabled. Set the token to connect.");
+    return;
   }
 
   try {
@@ -171,7 +175,6 @@ app.listen(PORT, async () => {
     console.log("✅ Discord gateway connected");
   } catch (err) {
     console.error("❌ Discord login failed:", err);
-    process.exit(1);
   }
 });
 

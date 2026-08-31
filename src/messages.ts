@@ -5,9 +5,16 @@ import {
 } from "discord.js";
 
 // ── Letta client ───────────────────────────────────────────────────────────────
+const LETTA_TIMEOUT_MS = parseInt(
+  process.env.LETTA_TIMEOUT_MS || "60000",
+  10,
+);
+
 const letta = new Letta({
   apiKey: process.env.LETTA_API_KEY || "",
   baseURL: process.env.LETTA_BASE_URL || "https://api.letta.com",
+  timeout: LETTA_TIMEOUT_MS,
+  maxRetries: 1,
 });
 
 const AGENT_ID = process.env.LETTA_AGENT_ID || "";
@@ -83,9 +90,11 @@ export async function sendMessage(
   const fullMessage = `${contextBlock}${prefix} ${message.content}`.trim();
 
   // Send to Letta and get response
+  console.log(`📤 Sending to Letta (agent=${AGENT_ID}): ${fullMessage.substring(0, 100)}...`);
   const response = await letta.agents.messages.create(AGENT_ID, {
     messages: [{ role: "user", content: fullMessage }],
   });
+  console.log(`📥 Letta responded (${response.messages?.length || 0} messages)`);
 
   // Extract assistant messages from response
   const assistantMessages = response.messages?.filter(

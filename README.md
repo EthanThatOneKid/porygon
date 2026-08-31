@@ -16,9 +16,18 @@ Built with [discord.js](https://discord.js.org) and the [Letta TypeScript SDK](h
 ### Prerequisites
 
 - Node.js 20+
-- A [Discord bot token](https://discord.com/developers/applications)
+- A Discord bot token (see [Creating a Discord Bot Token](#creating-a-discord-bot-token) below)
 - A [Letta Cloud API key](https://app.letta.com/preferences/api-keys)
 - A Letta agent ID (create one at [app.letta.com](https://app.letta.com))
+
+### Creating a Discord Bot Token
+
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
+2. Click **New Application** (or select your existing app)
+3. Go to **Bot** in the left sidebar
+4. Under **Token**, click **Copy** (or **Reset Token** for a fresh one)
+5. In the same **Bot** page, enable **Message Content Intent** (required — the bot reads message content)
+6. Invite the bot to your server via **OAuth2 → URL Generator** with the `bot` scope and appropriate permissions
 
 ### Local development
 
@@ -40,11 +49,13 @@ npm run dev
 
 1. Connect your GitHub repo to [Render](https://render.com)
 2. Create a new **Web Service** using the `Dockerfile`
-3. Set environment variables:
-   - `DISCORD_TOKEN` — Your bot token
+3. Set environment variables in the **Environment** tab:
+   - `DISCORD_TOKEN` — Your bot token (from above)
    - `LETTA_API_KEY` — Your Letta Cloud API key
    - `LETTA_AGENT_ID` — Your agent's ID
 4. Deploy
+
+> **Note:** `render.yaml` declares these env vars with `sync: false`, meaning they must be set manually in the Render dashboard — they won't be pulled from any `.env` file.
 
 The bot connects to Discord via WebSocket (no public URL needed).
 
