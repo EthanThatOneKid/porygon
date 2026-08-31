@@ -153,8 +153,9 @@ export async function sendMessageRaw(
   console.log(`📥 Letta responded (${response.messages?.length || 0} messages)`);
   console.log(`📥 Messages:`, JSON.stringify(response.messages?.map((m: any) => ({ role: m.role, content: m.content }))));
 
+  // Handle both formats: messages with role field, or messages with just content
   const assistantMessages = response.messages?.filter(
-    (m: any) => m.role === "assistant",
+    (m: any) => m.role === "assistant" || (!m.role && m.content),
   );
 
   console.log(`📥 Assistant messages found: ${assistantMessages?.length || 0}`);
