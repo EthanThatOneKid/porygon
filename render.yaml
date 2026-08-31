@@ -11,7 +11,9 @@ services:
       - key: LETTA_API_KEY
         sync: false
       - key: LETTA_AGENT_ID
-        sync: false
+        # Free tier: use Blank agent (no tool claims in system prompt)
+        # Pro/API: switch back to original Porygon agent for cloud sandbox tools
+        value: "agent-73c98a83-9c1d-4d85-8856-93b0932b2e10"
 
       # Message batching (reduces API calls in active channels)
       - key: MESSAGE_BATCH_ENABLED
