@@ -28,7 +28,7 @@
   },
   "homepage": "https://github.com/EthanThatOneKid/porygon#readme",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@letta-ai/letta-agent-sdk": "^0.8.0",
