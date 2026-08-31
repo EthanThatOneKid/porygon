@@ -10,7 +10,7 @@ import {
   Partials,
   ApplicationCommandType,
 } from "discord.js";
-import { sendMessage, sendMessageRaw, sendTimerMessage, MessageType, splitMessage, formatPrefix } from "./messages.js";
+import { sendMessage, sendMessageRaw, sendTimerMessage, MessageType, splitMessage, formatPrefix, closeSessions, resolveApproval, getApprovalInfo, getPendingApprovalKey } from "./messages.js";
 
 // ── Configuration ──────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
@@ -268,8 +268,32 @@ function addMessageToBatch(
   channelBatchTimers.set(channelId, timeout);
 }
 
-// ── Interaction handler (context menu commands via WebSocket) ────────────────
+// ── Interaction handler (context menu commands + button approvals) ──────────
 client.on("interactionCreate", async (interaction: Interaction) => {
+  // Handle button interactions for tool approval (#32)
+  if (interaction.isButton()) {
+    const [action, approvalKey] = interaction.customId.split(":", 2);
+    if (action === "approve" || action === "deny") {
+      const allow = action === "approve";
+      const resolved = resolveApproval(approvalKey, {
+        allow,
+        message: allow ? "Approved by user" : "Denied by user",
+      });
+      if (resolved) {
+        await interaction.reply({
+          content: allow ? "✅ Tool approved" : "❌ Tool denied",
+          ephemeral: true,
+        });
+      } else {
+        await interaction.reply({
+          content: "⚠️ Approval already resolved or expired",
+          ephemeral: true,
+        });
+      }
+      return;
+    }
+  }
+
   if (!interaction.isContextMenuCommand()) return;
 
   const commandName = interaction.commandName;
@@ -553,14 +577,16 @@ app.listen(PORT, async () => {
   }
 });
 
-// Graceful shutdown
-process.on("SIGTERM", () => {
-  console.log("👋 SIGTERM received, shutting down...");
+// Graceful shutdown (#31)
+async function gracefulShutdown(signal: string) {
+  console.log(`👋 ${signal} received, shutting down...`);
+  try {
+    await closeSessions();
+  } catch (err) {
+    console.error("❌ Error closing sessions:", err);
+  }
   client.destroy();
   process.exit(0);
-});
-process.on("SIGINT", () => {
-  console.log("👋 SIGINT received, shutting down...");
-  client.destroy();
-  process.exit(0);
-});
+}
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));

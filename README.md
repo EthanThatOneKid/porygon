@@ -2,10 +2,11 @@
 
 A stateful Discord bot powered by [Letta Cloud](https://app.letta.com). Porygon remembers conversations across sessions and channels.
 
-Built with [discord.js](https://discord.js.org) and the [Letta TypeScript SDK](https://github.com/letta-ai/letta-client).
+Built with [discord.js](https://discord.js.org) and the [Letta Agent SDK](https://github.com/letta-ai/letta-agent-sdk) for cloud-hosted compute access.
 
 ## Features
 
+- **Cloud compute access** — Agent runs shell commands, installs deps, and uses tools via managed cloud sandboxes
 - **Stateful memory** — Porygon remembers context across conversations
 - **Multi-channel** — Responds to DMs, @mentions, and replies
 - **Thread support** — Full thread context and optional reply-in-threads
@@ -111,9 +112,35 @@ The bot connects to Discord via WebSocket (no public URL needed).
 | `DISCORD_TOKEN` | Yes | — | Discord bot token |
 | `LETTA_API_KEY` | Yes | — | Letta Cloud API key |
 | `LETTA_AGENT_ID` | Yes | — | Letta agent ID to use |
-| `LETTA_BASE_URL` | No | `https://api.letta.com` | Letta API base URL |
-| `LETTA_TIMEOUT_MS` | No | `60000` | Letta API request timeout (ms) |
 | `PORT` | No | `3001` | HTTP server port |
+| `LETTA_TIMEOUT_MS` | No | `60000` | Letta API request timeout (ms) |
+
+### Cloud Sandbox
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `SANDBOX_TTL_MINUTES` | No | `5` | How long the sandbox stays alive after last activity |
+| `SANDBOX_REFRESH_INTERVAL_MS` | No | `240000` | How often to refresh the sandbox while active (4 min) |
+
+### Tool Approval (Human-in-the-Loop)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ENABLE_TOOL_APPROVAL` | No | `false` | Enable interactive approval for tool calls via Discord |
+| `TOOL_APPROVAL_TIMEOUT_MS` | No | `60000` | How long to wait for user approval before denying |
+
+When enabled, the agent asks for permission before running shell commands or other tools. The Discord user sees Approve/Deny buttons. When disabled (default), all tools are auto-approved in the sandbox.
+
+### Session Isolation
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `SESSION_ISOLATION` | No | `channel` | `channel`, `user`, or `global` |
+
+Controls how Letta sessions map to Discord:
+- `channel` — one session per channel (default, backward compatible)
+- `user` — one session per user per channel (more isolation, more sandboxes)
+- `global` — single shared session for all channels
 
 ### Message Behavior
 
@@ -169,10 +196,15 @@ The bot connects to Discord via WebSocket (no public URL needed).
 ## Architecture
 
 ```
-Discord ←WebSocket→ discord.js ←→ Letta Cloud API
+Discord ←WebSocket→ discord.js ←→ Letta Agent SDK ←→ Letta Cloud
+                                                              ↓
+                                                    Cloud Sandbox
+                                                  (shell, files, tools)
                     ↑
               Express (health check + interactions)
 ```
+
+The Agent SDK manages sessions with cloud sandboxes — isolated computers where the agent runs shell commands, installs dependencies, and uses tools. Each Discord channel gets its own session for conversation continuity.
 
 The bot connects to Discord's gateway via WebSocket. Messages are sent to Letta Cloud for processing, and responses are sent back to Discord.
 
