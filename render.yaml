@@ -5,9 +5,24 @@ services:
     plan: free
     healthCheckPath: /healthz
     envVars:
+      # Required
       - key: DISCORD_TOKEN
         sync: false
       - key: LETTA_API_KEY
         sync: false
       - key: LETTA_AGENT_ID
         sync: false
+
+      # Message batching (reduces API calls in active channels)
+      - key: MESSAGE_BATCH_ENABLED
+        value: "true"
+      - key: MESSAGE_BATCH_SIZE
+        value: "10"
+      - key: MESSAGE_BATCH_TIMEOUT_MS
+        value: "30000"
+
+      # Thread support (organized discussions)
+      - key: REPLY_IN_THREADS
+        value: "true"
+      - key: ENABLE_THREAD_CONVERSATIONS
+        value: "true"
