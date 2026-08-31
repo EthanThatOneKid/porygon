@@ -1,9 +1,7 @@
 services:
   - type: web
     name: porygon
-    runtime: image
-    image:
-      url: # Set after first Docker build, or use Render's "Deploy from Dockerfile"
+    runtime: docker
     plan: free
     healthCheckPath: /healthz
     envVars:
@@ -13,5 +11,3 @@ services:
         sync: false
       - key: LETTA_AGENT_ID
         sync: false
-      - key: LETTA_BASE_URL
-        value: https://api.letta.com
