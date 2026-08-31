@@ -107,11 +107,26 @@ async function getSession(key: string): Promise<LettaCodeSession> {
   console.log(`🆕 Creating Letta session (key=${key})`);
   const session = letta.createSession(AGENT_ID, {
     permissionMode: ENABLE_TOOL_APPROVAL ? "standard" : "unrestricted",
+    toolset: { base: "default" },
     canUseTool: ENABLE_TOOL_APPROVAL
       ? (toolName, toolInput) => requestToolApproval(toolName, toolInput, key)
       : undefined,
   });
   sessionCache.set(key, session);
+
+  // Diagnostic: log available tools after session connects
+  try {
+    const info = await session.ready();
+    console.log(`🔧 Session ready (agent=${info.agentId}, model=${info.model})`);
+    if (info.tools && info.tools.length > 0) {
+      console.log(`🛠️  Available tools (${info.tools.length}): ${info.tools.join(", ")}`);
+    } else {
+      console.warn(`⚠️  No tools reported by session — shell execution may not work`);
+    }
+  } catch (err) {
+    console.error(`❌ Failed to get session ready info:`, err);
+  }
+
   return session;
 }
 
