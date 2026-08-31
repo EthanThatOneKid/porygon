@@ -26,3 +26,27 @@ services:
         value: "true"
       - key: ENABLE_THREAD_CONVERSATIONS
         value: "true"
+
+      # Cloud Sandbox Configuration
+      - key: SANDBOX_TTL_MINUTES
+        value: "5"
+      - key: SANDBOX_REFRESH_INTERVAL_MS
+        value: "240000"
+
+      # Tool Approval (Human-in-the-Loop)
+      - key: ENABLE_TOOL_APPROVAL
+        value: "false"
+      - key: TOOL_APPROVAL_TIMEOUT_MS
+        value: "60000"
+
+      # Session Isolation
+      - key: SESSION_ISOLATION
+        value: "channel"
+
+      # Image Handling
+      - key: ENABLE_IMAGE_HANDLING
+        value: "false"
+
+      # Timer/Heartbeat
+      - key: ENABLE_TIMER
+        value: "false"
