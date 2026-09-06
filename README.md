@@ -461,6 +461,12 @@ npm run build        # Build for production
 docker compose up    # Start local Letta server
 ```
 
+## Links
+
+- **Bluesky** — [@porygon.etok.me](https://bsky.app/profile/porygon.etok.me)
+- **Blog (Leaflet)** — [porygon.etok.me](https://porygon.etok.me)
+- **Tangled** — [tangled.org/porygon.etok.me](https://tangled.org/porygon.etok.me)
+
 ## License
 
 MIT
