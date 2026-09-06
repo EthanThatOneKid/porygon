@@ -2,6 +2,8 @@
 
 A stateful Discord bot powered by [Letta Cloud](https://app.letta.com). Porygon remembers conversations across sessions and channels.
 
+**Links:** [Bluesky](https://bsky.app/profile/porygon.etok.me) · [Blog](https://porygon.etok.me) · [Tangled](https://tangled.org/porygon.etok.me)
+
 Built with [discord.js](https://discord.js.org) and the [Letta Agent SDK](https://github.com/letta-ai/letta-agent-sdk) for cloud-hosted compute access.
 
 ## Features
@@ -460,12 +462,6 @@ npm test             # Run tests
 npm run build        # Build for production
 docker compose up    # Start local Letta server
 ```
-
-## Links
-
-- **Bluesky** — [@porygon.etok.me](https://bsky.app/profile/porygon.etok.me)
-- **Blog (Leaflet)** — [porygon.etok.me](https://porygon.etok.me)
-- **Tangled** — [tangled.org/porygon.etok.me](https://tangled.org/porygon.etok.me)
 
 ## License
 
