@@ -45,6 +45,15 @@ const FIRING_PROBABILITY = parseFloat(
 );
 const INTERACTION_PUBLIC_KEY = process.env.INTERACTION_PUBLIC_KEY || "";
 
+// ── Wake-up notification ─────────────────────────────────────────────────────
+// When a cold "Start Porygon" interaction arrives (Discord already timed out),
+// store the channel/user context so we can notify them once the gateway connects.
+let pendingWakeUp: {
+  channelId: string;
+  guildId?: string;
+  userId: string;
+} | null = null;
+
 // ── Environment check ──────────────────────────────────────────────────────────
 console.log("🚀 Starting Porygon...");
 console.log("📋 Environment:");
@@ -96,6 +105,24 @@ client.once("clientReady", async () => {
 
   // Register context menu command
   await registerContextMenuCommand();
+
+  // Send wake-up notification if we have pending context from a cold start
+  if (pendingWakeUp) {
+    try {
+      const channel = await client.channels.fetch(pendingWakeUp.channelId);
+      if (channel && "send" in channel) {
+        await (channel as any).send(
+          `✅ Porygon is now online! <@${pendingWakeUp.userId}>`,
+        );
+        console.log(
+          `📋 Sent wake-up notification to channel ${pendingWakeUp.channelId}`,
+        );
+      }
+    } catch (err) {
+      console.error("❌ Failed to send wake-up notification:", err);
+    }
+    pendingWakeUp = null;
+  }
 });
 
 // ── Context menu command registration ──────────────────────────────────────
@@ -620,8 +647,14 @@ app.post("/interactions", (req: Request, res: Response) => {
 
       // "Start Porygon" context menu command
       if (commandName === "Start Porygon") {
-        // Respond immediately, then connect to Discord if not already
+        // Store wake-up context for notification once gateway connects
         if (!client.isReady()) {
+          pendingWakeUp = {
+            channelId: interaction.channel_id,
+            guildId: interaction.guild_id,
+            userId: interaction.member?.user?.id || interaction.user?.id || "unknown",
+          };
+          console.log(`📋 Stored wake-up context: channel=${interaction.channel_id}, user=${pendingWakeUp.userId}`);
           console.log("🔌 Waking up - connecting to Discord...");
           client.login(process.env.DISCORD_TOKEN || "").catch((err) => {
             console.error("❌ Failed to connect to Discord:", err);
