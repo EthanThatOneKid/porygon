@@ -434,6 +434,8 @@ On Render's free tier, the service spins down after ~15 min of inactivity. The i
 3. Render wakes up, Express responds
 4. Bot connects to Discord
 
+**Expected behavior on cold start:** Discord may show "The application did not respond" because Render's boot time (~30–60s) exceeds Discord's 3-second interaction timeout. This is cosmetic — the POST still wakes the service. Once the bot connects, it will send a follow-up message in the channel: `✅ Porygon is now online! @user`
+
 To enable:
 1. Set `INTERACTION_PUBLIC_KEY` in Render (from Discord Developer Portal → App → General Information)
 2. Set Interactions Endpoint URL to `https://porygon.onrender.com/interactions`
