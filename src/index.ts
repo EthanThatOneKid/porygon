@@ -45,6 +45,15 @@ const FIRING_PROBABILITY = parseFloat(
 );
 const INTERACTION_PUBLIC_KEY = process.env.INTERACTION_PUBLIC_KEY || "";
 
+// Keep-alive: Render free tier spins down after 15 min without inbound HTTP
+// traffic (the Discord gateway connection does NOT count). A self-ping keeps
+// the service warm so "Start Porygon" never hits a cold start.
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL || "";
+const KEEP_ALIVE_INTERVAL_MS = parseInt(
+  process.env.KEEP_ALIVE_INTERVAL_MS || "600000", // 10 min (default)
+  10,
+);
+
 // ── Environment check ──────────────────────────────────────────────────────────
 console.log("🚀 Starting Porygon...");
 console.log("📋 Environment:");
@@ -644,6 +653,28 @@ app.post("/interactions", (req: Request, res: Response) => {
     res.json({ type: 1 });
   });
 });
+
+// ── Keep-alive self-ping ───────────────────────────────────────────────────────
+// Render injects RENDER_EXTERNAL_URL on its platform. Pinging our own
+// /healthz every KEEP_ALIVE_INTERVAL_MS counts as inbound traffic, preventing
+// the free-tier spin-down that causes "The application did not respond".
+if (RENDER_EXTERNAL_URL && KEEP_ALIVE_INTERVAL_MS > 0) {
+  const pingUrl = `${RENDER_EXTERNAL_URL.replace(/\/$/, "")}/healthz`;
+  setInterval(() => {
+    fetch(pingUrl)
+      .then((res) => {
+        if (!res.ok) {
+          console.warn(`⚠️  Keep-alive ping returned ${res.status}`);
+        }
+      })
+      .catch((err) => console.warn("⚠️  Keep-alive ping failed:", err));
+  }, KEEP_ALIVE_INTERVAL_MS);
+  console.log(
+    `🔄 Keep-alive enabled: pinging ${pingUrl} every ${Math.round(KEEP_ALIVE_INTERVAL_MS / 1000)}s`,
+  );
+} else {
+  console.log("🔄 Keep-alive disabled (no RENDER_EXTERNAL_URL or interval <= 0)");
+}
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, async () => {

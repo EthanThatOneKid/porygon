@@ -261,6 +261,12 @@ Bot: 💬 Thinking...
 |----------|----------|---------|-------------|
 | `INTERACTION_PUBLIC_KEY` | No | — | Discord interactions public key for signature verification |
 
+### Keep-Alive
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `KEEP_ALIVE_INTERVAL_MS` | No | `600000` (10 min) | How often the bot pings its own `/healthz` to prevent Render free-tier spin-down. Disabled when `RENDER_EXTERNAL_URL` is absent (non-Render hosts) or set to `0`. |
+
 ## Architecture
 
 ```
