@@ -34,8 +34,7 @@
     "@letta-ai/letta-agent-sdk": "^0.8.0",
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "tweetnacl": "^1.0.3"
+    "express": "^4.21.2"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
