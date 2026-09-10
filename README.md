@@ -17,7 +17,7 @@ Built with [discord.js](https://discord.js.org) and the [Letta Agent SDK](https:
 - **Timer/heartbeat** — Proactive agent behavior on a randomized schedule
 - **Code block preservation** — Splits messages without breaking code fences
 - **Letta Cloud** — Agent state persists across restarts
-- **Render-ready** — Deploys on Render free tier
+- **Always-on process** — Designed to run continuously as a Discord gateway bot
 
 **Requires Pro ($20/mo) or API plan for additional features:**
 - **Tool approval** — Interactive Approve/Deny buttons for human-in-the-loop tool execution
@@ -96,19 +96,9 @@ npm test       # Run tests
 npm run build  # Build for production
 ```
 
-### Deploy to Render
+### Deploy to Zo Computer
 
-1. Connect your GitHub repo to [Render](https://render.com)
-2. Create a new **Web Service** using the `Dockerfile`
-3. Set environment variables in the **Environment** tab:
-   - `DISCORD_TOKEN` — Your bot token (from above)
-   - `LETTA_API_KEY` — Your Letta Cloud API key
-   - `LETTA_AGENT_ID` — Your agent's ID (see below)
-4. Deploy
-
-> **Note:** `render.yaml` declares these env vars with `sync: false`, meaning they must be set manually in the Render dashboard — they won't be pulled from any `.env` file.
-
-The bot connects to Discord via WebSocket (no public URL needed).
+Run Porygon as a managed **process service** with `npm start`. Set `DISCORD_TOKEN`, `LETTA_API_KEY`, and `LETTA_AGENT_ID` as service secrets. No public URL is required: the bot connects to Discord through its WebSocket gateway, while `/healthz` remains available on localhost for diagnostics.
 
 ## Environment Variables
 
@@ -255,12 +245,6 @@ Bot: 💬 Thinking...
 - Tool execution progress visible in real-time
 - Better UX for long-running operations
 
-### Interactions Endpoint
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `INTERACTION_PUBLIC_KEY` | No | — | Discord interactions public key for signature verification |
-
 ## Architecture
 
 ```
@@ -282,7 +266,6 @@ Bot: 💬 Thinking...
                     │  Express (port     │
                     │  3001)             │
                     │  • /healthz        │
-                    │  • /interactions   │
                     └────────────────────┘
 ```
 
@@ -424,21 +407,6 @@ returned    "Denied"
 - Each approval has a unique key (session + tool + timestamp)
 - Timeout auto-denies after `TOOL_APPROVAL_TIMEOUT_MS`
 - Concurrent approvals don't conflict
-
-### Interactions Endpoint (Cold Start)
-
-On Render's free tier, the service spins down after ~15 min of inactivity. The interactions endpoint allows Discord to wake it up:
-
-1. Right-click a user in Discord → select **"Start Porygon"**
-2. Discord POSTs to `/interactions`
-3. Render wakes up, Express responds
-4. Bot connects to Discord
-
-**Expected behavior on cold start:** Discord may show "The application did not respond" because Render's boot time (~30–60s) exceeds Discord's 3-second interaction timeout. This is cosmetic — the POST still wakes the service. Once the bot connects, it will send a follow-up message in the channel: `✅ Porygon is now online! @user`
-
-To enable:
-1. Set `INTERACTION_PUBLIC_KEY` in Render (from Discord Developer Portal → App → General Information)
-2. Set Interactions Endpoint URL to `https://porygon.onrender.com/interactions`
 
 ## Health Check
 
