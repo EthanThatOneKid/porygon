@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0c1023" />
+  <title>Porygon // Stadium 2 Model Viewer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f7f1ff;
+      --muted: #9aa1c4;
+      --panel: rgba(18, 23, 52, .88);
+      --line: rgba(146, 156, 231, .24);
+      --pink: #f199bc;
+      --cyan: #9de9ed;
+      --yellow: #ffdd8a;
+      --deep: #090c1d;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      overflow-x: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 70% -10%, rgba(114, 113, 214, .28), transparent 42%),
+        radial-gradient(circle at 0% 100%, rgba(223, 95, 145, .14), transparent 34%),
+        var(--deep);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    body::before {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      content: "";
+      opacity: .18;
+      background-image: linear-gradient(rgba(255,255,255,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, black, transparent 80%);
+    }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 22px;
+    }
+
+    .masthead {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0 0 9px;
+      color: var(--cyan);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .18em;
+    }
+
+    .eyebrow::before {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      content: "";
+      background: var(--pink);
+      box-shadow: 0 0 14px var(--pink);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 5vw, 54px);
+      line-height: .95;
+      letter-spacing: -.08em;
+      font-weight: 800;
+      text-shadow: 4px 4px 0 rgba(241, 153, 188, .22);
+    }
+
+    .subtitle {
+      max-width: 550px;
+      margin: 11px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .readout {
+      min-width: 206px;
+      padding: 13px 15px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(20, 25, 56, .54);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    }
+
+    .readout-label {
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: .16em;
+    }
+
+    .readout-value {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 7px;
+      color: var(--cyan);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .readout-value::before {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      content: "";
+      background: currentColor;
+      box-shadow: 0 0 12px currentColor;
+    }
+
+    .readout-value.is-error { color: var(--pink); }
+
+    .viewer {
+      position: relative;
+      min-height: min(68vh, 690px);
+      overflow: hidden;
+      border: 1px solid rgba(153, 167, 242, .34);
+      border-radius: 17px;
+      background: linear-gradient(135deg, rgba(24, 30, 70, .95), rgba(11, 14, 34, .95));
+      box-shadow: 0 28px 90px rgba(0, 0, 0, .36), inset 0 1px 0 rgba(255,255,255,.07);
+      isolation: isolate;
+    }
+
+    .viewer::before,
+    .viewer::after {
+      position: absolute;
+      z-index: 1;
+      pointer-events: none;
+      content: "";
+    }
+
+    .viewer::before {
+      inset: 16px;
+      border: 1px solid rgba(157, 233, 237, .15);
+      border-radius: 11px;
+    }
+
+    .viewer::after {
+      right: 20px;
+      bottom: 20px;
+      left: 20px;
+      height: 34%;
+      background: radial-gradient(ellipse, rgba(0,0,0,.5), transparent 68%);
+      transform: translateY(18%);
+    }
+
+    #scene {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+      outline: none;
+    }
+
+    #scene:active { cursor: grabbing; }
+
+    .viewer-ui {
+      position: absolute;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .corner {
+      top: 29px;
+      left: 32px;
+      color: rgba(247, 241, 255, .74);
+      font-size: 10px;
+      letter-spacing: .13em;
+    }
+
+    .corner strong {
+      display: block;
+      margin-top: 7px;
+      color: var(--yellow);
+      font-size: 14px;
+      letter-spacing: .04em;
+    }
+
+    .hint {
+      right: 32px;
+      bottom: 28px;
+      max-width: 280px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.55;
+      text-align: right;
+    }
+
+    .hint b { color: var(--cyan); }
+
+    .fallback {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      display: grid;
+      place-items: center;
+      padding: 40px;
+      background: radial-gradient(circle at 50% 45%, rgba(35, 43, 91, .9), rgba(11, 14, 34, .96) 64%);
+    }
+
+    .fallback[hidden], .loading[hidden] { display: none; }
+
+    .fallback-card {
+      max-width: 330px;
+      text-align: center;
+    }
+
+    .fallback-card svg {
+      width: 190px;
+      margin-bottom: 22px;
+      filter: drop-shadow(0 15px 20px rgba(0,0,0,.36));
+    }
+
+    .fallback-card h2 { margin: 0 0 8px; font-size: 20px; }
+    .fallback-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+    .loading {
+      position: absolute;
+      z-index: 5;
+      top: 50%;
+      left: 50%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--cyan);
+      font-size: 11px;
+      letter-spacing: .12em;
+      transform: translate(-50%, -50%);
+    }
+
+    .loading::before {
+      width: 10px;
+      height: 10px;
+      border: 2px solid rgba(157,233,237,.25);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      content: "";
+      animation: orbit .8s linear infinite;
+    }
+
+    @keyframes orbit { to { transform: rotate(360deg); } }
+
+    .meta {
+      display: grid;
+      grid-template-columns: 1.25fr .75fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .panel {
+      min-height: 76px;
+      padding: 16px 18px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+    }
+
+    .panel-label {
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .panel p { margin: 0; font-size: 12px; line-height: 1.55; }
+    .panel p strong { color: var(--pink); font-weight: 700; }
+    .panel p a { color: var(--cyan); text-underline-offset: 3px; }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      margin-top: 16px;
+      color: #6d7398;
+      font-size: 10px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 720px) {
+      .shell { width: min(100% - 20px, 1180px); padding-top: 18px; }
+      .masthead { align-items: start; flex-direction: column; gap: 16px; }
+      .readout { width: 100%; }
+      .viewer { min-height: 68vh; }
+      .meta { grid-template-columns: 1fr; }
+      .hint { right: 26px; bottom: 23px; }
+      footer { flex-direction: column; gap: 4px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .loading::before { animation: none; }
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">NINTENDO 64 / MODEL VIEWER</p>
+        <h1>PORYGON</h1>
+        <p class="subtitle">A quiet little polygon from the Stadium 2 battle screen. Drag to orbit the turntable, or tap the model for a full spin.</p>
+      </div>
+      <div class="readout" aria-live="polite">
+        <div class="readout-label">RENDER STATUS</div>
+        <div class="readout-value" id="status">LOADING MODEL</div>
+      </div>
+    </header>
+
+    <section class="viewer" aria-label="Interactive 3D Porygon viewer">
+      <canvas id="scene" aria-label="Interactive 3D Porygon model"></canvas>
+      <div class="viewer-ui corner">SPECIMEN / 312300<strong>STADIUM 2</strong></div>
+      <div class="viewer-ui hint"><b>DRAG</b> orbit &nbsp;·&nbsp; <b>CLICK</b> spin<br />flat-shaded / bind-pose rip</div>
+      <div class="loading" id="loading">FETCHING GEOMETRY</div>
+      <div class="fallback" id="fallback" hidden>
+        <div class="fallback-card">
+          <svg viewBox="0 0 220 190" role="img" aria-label="Porygon fallback illustration">
+            <path d="M40 118 13 92l22-21 31 11 15-25 43 3 27-26 34 20-14 24 18 26-31 15-17 29-47-8-29 17Z" fill="#8edce5" stroke="#151a42" stroke-width="8" stroke-linejoin="round" />
+            <path d="m124 64 30-30 25 15-20 31Z" fill="#f199bc" stroke="#151a42" stroke-width="8" stroke-linejoin="round" />
+            <path d="m83 58 17-40 22 18-7 34Z" fill="#f199bc" stroke="#151a42" stroke-width="8" stroke-linejoin="round" />
+            <path d="m147 83 51 7-37 22Z" fill="#f7dd95" stroke="#151a42" stroke-width="8" stroke-linejoin="round" />
+            <circle cx="102" cy="65" r="7" fill="#151a42" />
+            <path d="m68 121 12 29M139 124l-3 30" stroke="#f7dd95" stroke-width="11" stroke-linecap="round" />
+          </svg>
+          <h2>3D SIGNAL LOST</h2>
+          <p id="fallback-message">The static Stadium-style mark is here instead of an empty black box.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="meta">
+      <div class="panel">
+        <div class="panel-label">Source</div>
+        <p><strong>Authentic Stadium 2 geometry</strong> · the extracted mesh is shown without the degenerate eye plates.</p>
+      </div>
+      <div class="panel">
+        <div class="panel-label">Controls</div>
+        <p>Turntable pauses while dragging. Motion can be fixed with <a href="?rot=0&freeze=1">?rot=0&amp;freeze=1</a>.</p>
+      </div>
+    </section>
+
+    <footer>
+      <span>3D model ripped from Pokémon Stadium 2 (N64) by lemurboy12 / The Models Resource.</span>
+      <span>Procedural idle · not a verbatim game animation</span>
+    </footer>
+  </main>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { ColladaLoader } from "three/addons/loaders/ColladaLoader.js";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+    const canvas = document.querySelector("#scene");
+    const viewer = document.querySelector(".viewer");
+    const statusEl = document.querySelector("#status");
+    const loadingEl = document.querySelector("#loading");
+    const fallbackEl = document.querySelector("#fallback");
+    const fallbackMessageEl = document.querySelector("#fallback-message");
+    const params = new URLSearchParams(location.search);
+    const fixedRotation = Number.isFinite(Number(params.get("rot"))) ? Number(params.get("rot")) : null;
+    const freeze = params.get("freeze") === "1";
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    let renderer;
+    let scene;
+    let camera;
+    let modelRoot;
+    let headBone;
+    let clock;
+    let lastFrame = 0;
+    let dragging = false;
+    let pointerStart = null;
+    let dragDistance = 0;
+    let spin = null;
+    let loaded = false;
+    let blink = null;
+    let nextBlinkAt = 1.8;
+    let baseY = 0;
+    let modelRadius = 25;
+
+    function setStatus(text, error = false) {
+      statusEl.textContent = text;
+      statusEl.classList.toggle("is-error", error);
+    }
+
+    function showFallback(message) {
+      loadingEl.hidden = true;
+      canvas.style.display = "none";
+      fallbackMessageEl.textContent = message;
+      fallbackEl.hidden = false;
+      setStatus("STATIC FALLBACK", true);
+    }
+
+    function canRender() {
+      try {
+        const probe = document.createElement("canvas");
+        return Boolean(probe.getContext("webgl2", { antialias: true }) || probe.getContext("webgl", { antialias: true }));
+      } catch {
+        return false;
+      }
+    }
+
+    function materialFor(source, geometry) {
+      const material = Array.isArray(source) ? source[0] : source;
+      const hasVertexColors = Boolean(geometry.getAttribute("color"));
+      const map = material?.map || null;
+      if (map) map.colorSpace = THREE.SRGBColorSpace;
+      const result = new THREE.MeshLambertMaterial({
+        color: material?.color?.clone?.() || new THREE.Color(0xffffff),
+        map,
+        vertexColors: hasVertexColors,
+        flatShading: true,
+        transparent: Boolean(material?.transparent),
+        opacity: material?.opacity ?? 1,
+        side: material?.side ?? THREE.FrontSide,
+      });
+      result.name = `${material?.name || "material"}_matte`;
+      return result;
+    }
+
+    function makeMatte(object) {
+      object.traverse((child) => {
+        if (!child.isMesh) return;
+        const name = `${child.name} ${child.material?.name || ""}`.toLowerCase();
+        if (name.includes("texture_2") || name.includes("eye")) {
+          child.visible = false;
+          return;
+        }
+        child.material = materialFor(child.material, child.geometry);
+        child.castShadow = true;
+        child.receiveShadow = true;
+      });
+    }
+
+    function findHead(object) {
+      let found;
+      object.traverse((child) => {
+        if (child.name === "Bone_12") found = child;
+      });
+      return found;
+    }
+
+    function frameModel(object) {
+      const box = new THREE.Box3().setFromObject(object);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      modelRadius = Math.max(size.x, size.y, size.z) / 2;
+      const distance = Math.max(modelRadius * 3.0, 43);
+      camera.position.copy(center).add(new THREE.Vector3(0, modelRadius * .1, distance));
+      camera.near = Math.max(.1, modelRadius / 100);
+      camera.far = modelRadius * 12;
+      camera.lookAt(center.x, center.y + modelRadius * .04, center.z);
+      camera.updateProjectionMatrix();
+      baseY = -center.y * .05;
+    }
+
+    function setModel(object, sourceName) {
+      modelRoot = new THREE.Group();
+      modelRoot.name = "PorygonTurntable";
+      modelRoot.add(object);
+      scene.add(modelRoot);
+      makeMatte(object);
+      headBone = findHead(object);
+      frameModel(modelRoot);
+      if (fixedRotation !== null) modelRoot.rotation.y = fixedRotation;
+      loaded = true;
+      loadingEl.hidden = true;
+      setStatus(sourceName);
+    }
+
+    function loadDae() {
+      return new Promise((resolve, reject) => {
+        new ColladaLoader().load("assets/rip/Porygon/porygon.dae", (data) => resolve(data.scene), undefined, reject);
+      });
+    }
+
+    function loadGlb() {
+      return new Promise((resolve, reject) => {
+        new GLTFLoader().load("assets/porygon.glb", (data) => resolve(data.scene), undefined, reject);
+      });
+    }
+
+    function startBlink(now) {
+      if (!headBone || freeze || reducedMotion) return;
+      blink = { started: now, duration: .14 };
+    }
+
+    function easeInOutCubic(value) {
+      return value < .5 ? 4 * value * value * value : 1 - Math.pow(-2 * value + 2, 3) / 2;
+    }
+
+    function tick(now) {
+      requestAnimationFrame(tick);
+      const elapsed = Math.min((now - lastFrame) / 1000, .1);
+      lastFrame = now;
+      if (!loaded || !modelRoot) return;
+      const t = clock.getElapsedTime();
+
+      if (spin) {
+        const progress = Math.min((t - spin.started) / spin.duration, 1);
+        const eased = easeInOutCubic(progress);
+        modelRoot.rotation.y = spin.from + Math.PI * 2 * eased;
+        if (progress >= 1) spin = null;
+      } else if (fixedRotation === null && !reducedMotion && !dragging && !freeze) {
+        modelRoot.rotation.y += elapsed * .15;
+      }
+
+      if (!freeze && !reducedMotion) {
+        modelRoot.position.y = baseY + Math.sin(t * 1.4) * modelRadius * .04;
+        if (headBone) {
+          headBone.rotation.z = Math.sin(t * .72) * .035;
+          headBone.rotation.x = Math.sin(t * .58 + .7) * .024;
+          if (t >= nextBlinkAt && !blink) startBlink(t);
+          if (blink) {
+            const progress = Math.min((t - blink.started) / blink.duration, 1);
+            const nod = Math.sin(progress * Math.PI) * .22;
+            headBone.rotation.x += nod;
+            if (progress >= 1) {
+              blink = null;
+              nextBlinkAt = t + 2 + Math.random() * 3;
+            }
+          }
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    function beginSpin() {
+      if (!modelRoot || freeze || reducedMotion || dragging) return;
+      spin = { started: clock.getElapsedTime(), duration: 1.15, from: modelRoot.rotation.y };
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (!modelRoot) return;
+      dragging = true;
+      pointerStart = { x: event.clientX, y: event.clientY, time: performance.now() };
+      dragDistance = 0;
+      spin = null;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!dragging || !pointerStart || !modelRoot) return;
+      const dx = event.clientX - pointerStart.x;
+      const dy = event.clientY - pointerStart.y;
+      dragDistance = Math.max(dragDistance, Math.hypot(dx, dy));
+      modelRoot.rotation.y += (event.movementX || 0) * .012;
+      modelRoot.rotation.x = THREE.MathUtils.clamp(modelRoot.rotation.x + (event.movementY || 0) * .006, -.28, .28);
+    });
+
+    canvas.addEventListener("pointerup", (event) => {
+      if (!pointerStart) return;
+      const duration = performance.now() - pointerStart.time;
+      const wasClick = duration <= 250 && dragDistance < 8;
+      dragging = false;
+      pointerStart = null;
+      if (wasClick) beginSpin();
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointercancel", () => {
+      dragging = false;
+      pointerStart = null;
+    });
+
+    addEventListener("resize", () => {
+      if (!renderer || !camera) return;
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setSize(viewer.clientWidth, viewer.clientHeight, false);
+      camera.aspect = viewer.clientWidth / viewer.clientHeight;
+      camera.updateProjectionMatrix();
+    });
+
+    async function boot() {
+      if (!canRender()) {
+        showFallback("WebGL is unavailable here, so the static Stadium-style mark is shown instead.");
+        return;
+      }
+
+      try {
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
+        renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+        renderer.setSize(viewer.clientWidth, viewer.clientHeight, false);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(31, viewer.clientWidth / viewer.clientHeight, .1, 200);
+        clock = new THREE.Clock();
+        scene.add(new THREE.AmbientLight(0xb8c9ff, 1.35));
+        const key = new THREE.DirectionalLight(0xffe8f1, 2.6);
+        key.position.set(-24, 35, 42);
+        key.castShadow = true;
+        scene.add(key);
+
+        let object;
+        try {
+          object = await loadDae();
+          setModel(object, "DAE / READY");
+        } catch {
+          object = await loadGlb();
+          setModel(object, "GLB / READY");
+        }
+        requestAnimationFrame(tick);
+      } catch {
+        showFallback("The 3D asset could not be decoded, so the static Stadium-style mark is shown instead.");
+      }
+    }
+
+    boot();
+  </script>
+</body>
+</html>
